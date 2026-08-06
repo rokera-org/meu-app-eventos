@@ -1,4 +1,6 @@
 streamlit
 pandas
 reportlab
-qrcode
+python-pptx
+pillow
+openpyxl
