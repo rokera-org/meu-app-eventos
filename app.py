@@ -3,229 +3,255 @@ import pandas as pd
 
 st.set_page_config(page_title="Plataforma de Eventos", layout="wide")
 
-# Estilização CSS customizada: Azul Petróleo (#0f4c5c), Tons de Cinza Médio/Escuro,
-# Estética Moderna/Gótica Leve, Fontes Sem Serifas (Sans-Serif) e Sem Emojis.
+# CSS para visual de Web App SaaS (Estilo Even3: Fundo claro, cabeçalho limpo e cards modernos)
 custom_css = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@300;400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-    /* Configurações Globais */
+    /* Fundo geral claro de Web App moderno */
     html, body, [class*="css"] {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-        background-color: #12181b;
-        color: #e2e8f0;
+        font-family: 'Inter', sans-serif !important;
+        background-color: #f8fafc !important;
+        color: #1e293b !important;
     }
 
     .stApp {
-        background-color: #12181b;
+        background-color: #f8fafc !important;
     }
 
-    /* Barra Lateral (Sidebar) */
+    /* Esconde barra nativa do Streamlit para parecer App nativo */
+    header[data-testid="stHeader"] {
+        background-color: #1e3a8a !important;
+    }
+
+    /* Barra Lateral estilo Dashboard SaaS */
     [data-testid="stSidebar"] {
-        background-color: #0d1214;
-        border-right: 1px solid #1f292d;
+        background-color: #ffffff !important;
+        border-right: 1px solid #e2e8f0 !important;
     }
 
-    /* Títulos - Tipografia com inspiração gótica moderna (sem serifa pesada) */
+    [data-testid="stSidebar"] * {
+        color: #475569 !important;
+    }
+
+    /* Títulos e Cabeçalhos */
     h1, h2, h3, h4 {
-        font-family: 'Cinzel', 'Inter', sans-serif !important;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-        color: #f1f5f9 !important;
-        font-weight: 600;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
     }
 
     h1 {
-        border-bottom: 2px solid #0f4c5c;
-        padding-bottom: 10px;
-        margin-bottom: 24px;
-        font-size: 1.8rem !important;
+        font-size: 1.6rem !important;
+        letter-spacing: -0.5px !important;
+        margin-bottom: 20px !important;
     }
 
     h2 {
-        font-size: 1.3rem !important;
-        color: #cbd5e1 !important;
-        margin-top: 15px;
+        font-size: 1.25rem !important;
+        margin-top: 10px !important;
     }
 
-    h3 {
-        font-size: 1.0rem !important;
-        color: #94a3b8 !important;
+    /* Cartões e Encartes estilo SaaS */
+    .app-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
     }
 
-    /* Botões em Azul Petróleo */
-    .stButton>button {
-        background-color: #0f4c5c !important;
+    /* Banner Superior Estilo Even3 */
+    .top-hero {
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        color: #ffffff;
+        padding: 28px 32px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .top-hero h2 {
         color: #ffffff !important;
-        border: 1px solid #1d6a7d !important;
-        border-radius: 2px !important;
-        font-family: 'Inter', sans-serif !important;
+        font-size: 1.5rem !important;
+        margin: 0 0 6px 0 !important;
+    }
+
+    .top-hero p {
+        color: #e0f2fe !important;
+        margin: 0 !important;
+        font-size: 0.95rem !important;
+    }
+
+    /* Botões Modernos e Arredondados em Azul Petróleo/Vibrante */
+    .stButton>button {
+        background-color: #0284c7 !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 6px !important;
         font-weight: 600 !important;
-        letter-spacing: 1px !important;
-        text-transform: uppercase !important;
-        padding: 0.5rem 1.2rem !important;
+        font-size: 0.9rem !important;
+        padding: 0.5rem 1.25rem !important;
         transition: all 0.2s ease !important;
     }
 
     .stButton>button:hover {
-        background-color: #135f73 !important;
-        border-color: #258197 !important;
-        box-shadow: 0 0 12px rgba(15, 76, 92, 0.4) !important;
+        background-color: #0369a1 !important;
+        box-shadow: 0 4px 12px rgba(3, 105, 161, 0.25) !important;
     }
 
-    /* Inputs e Caixas de Texto */
+    /* Inputs Limpos */
     .stTextInput>div>div>input, .stNumberInput>div>div>input {
-        background-color: #1a2226 !important;
-        color: #e2e8f0 !important;
-        border: 1px solid #2d3748 !important;
-        border-radius: 2px !important;
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
     }
 
     .stTextInput>div>div>input:focus, .stNumberInput>div>div>input:focus {
-        border-color: #0f4c5c !important;
-        box-shadow: 0 0 5px rgba(15, 76, 92, 0.5) !important;
+        border-color: #0284c7 !important;
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15) !important;
     }
 
-    /* Componentes de Métricas */
+    /* Métricas */
     [data-testid="stMetric"] {
-        background-color: #1a2226;
-        border: 1px solid #2a3439;
-        border-left: 3px solid #0f4c5c;
-        padding: 12px;
-        border-radius: 2px;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
 
     [data-testid="stMetricValue"] {
-        color: #f8fafc !important;
-        font-weight: 600;
+        color: #0284c7 !important;
+        font-weight: 700 !important;
     }
 
-    [data-testid="stMetricLabel"] {
-        color: #94a3b8 !important;
-        text-transform: uppercase;
-        font-size: 0.75rem;
+    /* Estilo do Certificado Limpo */
+    .certificate-container {
+        background-color: #ffffff;
+        border: 2px solid #0369a1;
+        border-radius: 8px;
+        padding: 32px;
+        text-align: center;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+    }
+
+    .cert-title {
+        color: #0369a1;
+        font-weight: 700;
+        font-size: 1.3rem;
         letter-spacing: 1px;
     }
 
-    /* Avisos e Caixas de Informação */
-    .stAlert {
-        background-color: #161e22 !important;
-        color: #cbd5e1 !important;
-        border: 1px solid #2a3439 !important;
-        border-left: 4px solid #0f4c5c !important;
-    }
-
-    /* Card do Certificado */
-    .certificate-card {
-        border: 1px solid #2a3439;
-        border-top: 3px solid #0f4c5c;
-        background-color: #161e22;
-        padding: 30px;
-        border-radius: 2px;
-        text-align: center;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    }
-
-    .certificate-title {
-        font-family: 'Cinzel', 'Inter', sans-serif;
-        color: #f1f5f9;
-        font-size: 1.3rem;
-        letter-spacing: 2px;
-        margin-bottom: 4px;
-    }
-
-    .certificate-sub {
+    .cert-sub {
         color: #64748b;
-        font-size: 0.7rem;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
+        font-size: 0.8rem;
         margin-bottom: 20px;
     }
 
-    .certificate-body {
-        color: #cbd5e1;
-        font-size: 0.9rem;
+    .cert-body {
+        color: #334155;
+        font-size: 0.95rem;
         line-height: 1.6;
-        margin: 25px 0;
+        margin: 20px 0;
     }
 
-    .certificate-footer {
+    .cert-footer {
         display: flex;
         justify-content: space-between;
         align-items: flex-end;
-        margin-top: 30px;
-        padding-top: 15px;
-        border-top: 1px solid #243036;
-        font-size: 0.75rem;
-        color: #94a3b8;
-    }
-
-    .svg-icon {
-        display: inline-block;
-        vertical-align: middle;
-        fill: #0f4c5c;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 16px;
+        margin-top: 24px;
+        font-size: 0.8rem;
+        color: #64748b;
     }
 </style>
 """
 
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# Cabeçalho Principal
-st.markdown("<h1>PLATAFORMA DE GESTÃO DE EVENTOS ACADÊMICOS</h1>", unsafe_allow_html=True)
-st.caption("Módulo de Controle Integrado e Emissão de Documentos")
-
-# Sidebar de Navegação
-st.sidebar.markdown("<h3 style='margin-bottom: 15px;'>NAVEGAÇÃO</h3>", unsafe_allow_html=True)
-opcao = st.sidebar.radio(
-    "",
-    ["Painel Geral", "Emissão de Certificados", "Anais e Publicações"]
+# Banner Principal Superior estilo Web App
+st.markdown(
+    """
+    <div class="top-hero">
+        <h2>Plataforma de Gestão de Eventos</h2>
+        <p>Gerencie inscrições, emita certificados com validação digital e publique trabalhos.</p>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
-if opcao == "Painel Geral":
-    st.markdown("<h2>Painel de Inscrições e Métricas</h2>", unsafe_allow_html=True)
-    arquivo_csv = st.file_uploader("Upload da lista de participantes (.CSV)", type=["csv"])
+# Menu Lateral (Sidebar)
+st.sidebar.markdown("### Menu Principal")
+opcao = st.sidebar.radio(
+    "",
+    ["Início / Painel", "Inscrições & Participantes", "Emitir Certificados", "Anais do Evento"]
+)
+
+if opcao == "Início / Painel":
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Eventos Ativos", "1")
+    col2.metric("Inscrições Confirmadas", "128")
+    col3.metric("Certificados Emitidos", "128")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    st.markdown(
+        """
+        <div class="app-card">
+            <h3>Visão Geral do Evento</h3>
+            <p style="color: #64748b; font-size: 0.9rem;">
+                Selecione uma das opções no menu lateral para gerenciar as inscrições, 
+                configurar a emissão de certificados ou acessar as submissões acadêmicas.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+elif opcao == "Inscrições & Participantes":
+    st.markdown("<h2>Gestão de Inscritos</h2>", unsafe_allow_html=True)
+    
+    arquivo_csv = st.file_uploader("Importar lista de credenciamento (.CSV)", type=["csv"])
     
     if arquivo_csv is not None:
         df = pd.read_csv(arquivo_csv)
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total de Inscritos", len(df))
-        col2.metric("Status da Plataforma", "Ativo")
-        col3.metric("Certificados Gerados", len(df))
-        
-        st.markdown("<h3 style='margin-top:25px;'>Registro de Participantes</h3>", unsafe_allow_html=True)
         st.dataframe(df, use_container_width=True)
     else:
-        st.info("Aguardando carregamento de arquivo de dados em formato CSV.")
+        st.info("Envie um arquivo CSV com a lista de participantes para carregar a tabela.")
 
-elif opcao == "Emissão de Certificados":
-    st.markdown("<h2>Geração e Validação de Certificados</h2>", unsafe_allow_html=True)
+elif opcao == "Emitir Certificados":
+    st.markdown("<h2>Emissão e Validação de Certificados</h2>", unsafe_allow_html=True)
+    
     col_form, col_preview = st.columns([1, 1])
     
     with col_form:
-        st.markdown("<h3>Parâmetros do Documento</h3>", unsafe_allow_html=True)
+        st.markdown("<div class='app-card'>", unsafe_allow_html=True)
+        st.markdown("### Dados do Participante")
         nome = st.text_input("Nome Completo", "Maria Eduarda Silva")
-        evento = st.text_input("Nome do Evento", "I Simpósio Acadêmico")
-        horas = st.number_input("Carga Horária", min_value=1, value=20)
-        codigo = st.text_input("Código de Verificação", "AUT-2026-889A-X")
-        st.button("Gerar Documento")
+        evento = st.text_input("Nome do Evento", "Congresso Internacional de Tecnologia")
+        horas = st.number_input("Carga Horária (Horas)", min_value=1, value=20)
+        codigo = st.text_input("Código de Autenticidade", "EV3-2026-9981-X")
+        st.button("Gerar Certificado")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with col_preview:
-        st.markdown("<h3>Visualização Prévia</h3>", unsafe_allow_html=True)
         st.markdown(
             f"""
-            <div class="certificate-card">
-                <div class="certificate-title">CERTIFICADO DE PARTICIPAÇÃO</div>
-                <div class="certificate-sub">SISTEMA INTEGRADO DE AUTENTICAÇÃO ACADÊMICA</div>
-                <div class="certificate-body">
-                    Certificamos que <b>{nome}</b> participou da atividade <b>"{evento}"</b>, 
-                    cumprindo carga horária total de <b>{horas} horas</b>.
+            <div class="certificate-container">
+                <div class="cert-title">CERTIFICADO DE PARTICIPAÇÃO</div>
+                <div class="cert-sub">SISTEMA INTEGRADO DE EVENTOS ACADÊMICOS</div>
+                <div class="cert-body">
+                    Certificamos que <b>{nome}</b> participou do evento <b>"{evento}"</b>, 
+                    com carga horária total de <b>{horas} horas</b>.
                 </div>
-                <div class="certificate-footer">
+                <div class="cert-footer">
                     <div style="text-align: left;">
-                        <b>Autenticação:</b> {codigo}<br>
-                        <svg class="svg-icon" width="12" height="12" viewBox="0 0 24 24">
-                            <path d="M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm13-2h3v2h-3zm-3 2h2v3h-2zm3 3h3v3h-3zm-3 1h2v2h-2z"/>
-                        </svg> Validação Digital
+                        <b>Código:</b> {codigo}<br>
+                        <span>Validação via QR Code</span>
                     </div>
                     <div style="text-align: right;">
                         _______________________<br>
@@ -233,13 +259,16 @@ elif opcao == "Emissão de Certificados":
                     </div>
                 </div>
             </div>
-            """, 
+            """,
             unsafe_allow_html=True
         )
 
-elif opcao == "Anais e Publicações":
-    st.markdown("<h2>Repositório de Publicações</h2>", unsafe_allow_html=True)
-    st.text_input("Título da Submissão")
-    st.text_input("Autores e Filiação")
-    st.file_uploader("Upload do Trabalho (.PDF)", type=["pdf"])
-    st.button("Submeter para os Anais")
+elif opcao == "Anais do Evento":
+    st.markdown("<h2>Submissão de Trabalhos</h2>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='app-card'>", unsafe_allow_html=True)
+    st.text_input("Título do Artigo / Resumo")
+    st.text_input("Autores")
+    st.file_uploader("Arquivo do Trabalho (.PDF)", type=["pdf"])
+    st.button("Enviar Submissão")
+    st.markdown("</div>", unsafe_allow_html=True)
