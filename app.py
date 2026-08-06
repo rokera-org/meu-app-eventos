@@ -4,7 +4,7 @@ import time
 
 st.set_page_config(page_title="Rokfy — Plataforma de Eventos", layout="wide")
 
-# Inicialização de Estado Global
+# Inicialização do Estado Global
 if "eventos" not in st.session_state:
     st.session_state["eventos"] = [
         {
@@ -19,36 +19,35 @@ if "eventos" not in st.session_state:
         }
     ]
 
-# Estilização CSS Avançada: Fonte Chomsky Real, Menu Hambúrguer (3 Traços) e UI Modernizada
+# Estilização CSS com Fonte Chomsky Local, Chapa Salmão e Ícone ☰
 custom_css = """
 <style>
-    /* Importação de Fontes Modernas */
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
-    /* Importação Direta da Fonte Chomsky Oficial */
+    /* Tentar carregar Chomsky instalada no computador local */
     @font-face {
         font-family: 'Chomsky';
-        src: url('https://cdn.jsdelivr.net/gh/mcdry/chomsky-font@master/Chomsky.otf') format('opentype'),
-             url('https://db.onlinewebfonts.com/t/7a165b4526b7d2f9b20e06bd30cbcf82.ttf') format('truetype');
+        src: local('Chomsky'), local('Chomsky Regular'), local('Chomsky-Regular');
         font-weight: normal;
         font-style: normal;
     }
 
-    /* Reset Global com Design Moderno Arredondado */
+    /* Fundo da Aplicação em Chapa Salmão Vibrante */
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
-        background-color: #FAF9F6 !important;
+        background-color: #FA8072 !important; /* Chapa Salmão */
         color: #1A1A1A !important;
     }
 
     .stApp {
-        background-color: #FAF9F6 !important;
+        background-color: #FA8072 !important;
     }
 
-    /* Subtituição Visual do Botão da Sidebar (Flechas >> por 3 Traços ☰) */
+    /* Ocultar Setas << / >> da Sidebar e Injetar ☰ (3 Traços) */
     button[data-testid="stSidebarCollapseButton"] svg,
     button[aria-label="Close sidebar"] svg,
-    button[aria-label="Open sidebar"] svg {
+    button[aria-label="Open sidebar"] svg,
+    [data-testid="stSidebarNav"] button svg {
         display: none !important;
     }
 
@@ -56,11 +55,11 @@ custom_css = """
     button[aria-label="Close sidebar"]::after,
     button[aria-label="Open sidebar"]::after {
         content: "☰" !important;
-        font-size: 1.4rem !important;
-        font-weight: bold !important;
+        font-size: 1.5rem !important;
+        font-weight: 800 !important;
         color: #1A1A1A !important;
         display: block !important;
-        text-align: center;
+        line-height: 1 !important;
     }
 
     /* Top Navigation Bar */
@@ -69,10 +68,9 @@ custom_css = """
         justify-content: space-between;
         align-items: center;
         background: #FFFFFF;
-        padding: 14px 28px;
+        padding: 16px 30px;
         border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-        border: 1px solid #EAE6DF;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
         margin-bottom: 25px;
     }
 
@@ -82,11 +80,9 @@ custom_css = """
     }
 
     .nav-link-item {
-        color: #555555;
-        font-weight: 600;
+        color: #333333;
+        font-weight: 700;
         font-size: 0.92rem;
-        text-decoration: none;
-        transition: color 0.2s;
         cursor: pointer;
     }
 
@@ -94,16 +90,16 @@ custom_css = """
         color: #E05A47;
     }
 
-    /* Sidebar Estilizada */
+    /* Sidebar */
     [data-testid="stSidebar"] {
-        background-color: #F4F1EA !important;
-        border-right: 1px solid #E5E0D8 !important;
+        background-color: #FFF8F6 !important;
+        border-right: 2px solid #EAE0DE !important;
     }
 
-    /* Logo Rokfy em Fonte Chomsky Legítima */
-    .brand-logo {
-        font-family: 'Chomsky', 'UnifrakturMaguntia', serif !important;
-        font-size: 3.6rem !important;
+    /* Texto do Logo usando Chomsky com Fallback Gótico */
+    .brand-logo-text {
+        font-family: 'Chomsky', 'UnifrakturMaguntia', 'Old English Text MT', serif !important;
+        font-size: 3.8rem !important;
         color: #E05A47 !important;
         text-align: center;
         margin: 0;
@@ -120,28 +116,28 @@ custom_css = """
         color: #1A1A1A !important;
         text-transform: uppercase;
         text-align: center;
-        margin-top: 8px;
+        margin-top: 10px;
         margin-bottom: 20px;
     }
 
     .divider-line {
-        height: 1px;
-        background: linear-gradient(90deg, rgba(224,90,71,0) 0%, rgba(224,90,71,0.3) 50%, rgba(224,90,71,0) 100%);
+        height: 2px;
+        background: #E05A47;
+        opacity: 0.2;
         margin: 15px 0 25px 0;
     }
 
-    /* Hero Banner Fluido e Moderno */
+    /* Cards e Containers */
     .hero-card {
-        background: linear-gradient(135deg, #FFFFFF 0%, #F5F1E8 100%);
+        background: #FFFFFF;
         border-radius: 20px;
         padding: 36px;
-        border: 1px solid #EAE6DF;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.03);
-        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
     }
 
     .hero-card h1 {
-        font-size: 2rem !important;
+        font-size: 2.1rem !important;
         font-weight: 800 !important;
         color: #1A1A1A !important;
         margin-bottom: 8px !important;
@@ -149,27 +145,19 @@ custom_css = """
 
     .hero-card p {
         font-size: 1rem !important;
-        color: #666666 !important;
+        color: #555555 !important;
         margin: 0 !important;
     }
 
-    /* Cards com Cantos Soft Arredondados */
     .rokfy-card-modern {
         background: #FFFFFF;
         border-radius: 18px;
         padding: 28px;
-        border: 1px solid #EAE6DF;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.06);
         margin-bottom: 20px;
     }
 
-    .rokfy-card-modern:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.05);
-    }
-
-    /* Botões Modernos e Arredondados */
+    /* Botões */
     .stButton>button {
         background-color: #E05A47 !important;
         color: #ffffff !important;
@@ -178,42 +166,33 @@ custom_css = """
         font-weight: 700 !important;
         font-size: 0.9rem !important;
         padding: 0.65rem 1.6rem !important;
-        box-shadow: 0 4px 12px rgba(224, 90, 71, 0.2) !important;
-        transition: all 0.2s ease !important;
+        box-shadow: 0 4px 12px rgba(224, 90, 71, 0.3) !important;
     }
 
     .stButton>button:hover {
         background-color: #C84B39 !important;
         transform: translateY(-1px);
-        box-shadow: 0 6px 18px rgba(224, 90, 71, 0.35) !important;
     }
 
-    /* Certificados Elegantes */
+    /* Moldura para Certificado */
     .cert-container {
         background: #FFFFFF;
         border-radius: 20px;
         padding: 35px;
-        border: 2px solid #1A1A1A;
+        border: 3px solid #1A1A1A;
         text-align: center;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-    }
-
-    .cert-title-chomsky {
-        font-family: 'Chomsky', serif;
-        font-size: 2.8rem;
-        color: #1A1A1A;
-        margin-bottom: 5px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     }
 </style>
 """
 
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# Barra de Navegação Superior (Home, Sobre Nós, Quem Somos, Contato)
+# Top Bar
 st.markdown(
     """
     <div class="top-navbar">
-        <div style="font-weight: 800; font-size: 1.1rem; color: #E05A47;">ROKFY PLATFORM</div>
+        <div style="font-weight: 800; font-size: 1.1rem; color: #E05A47; letter-spacing: 1px;">ROKFY PLATFORM</div>
         <div class="nav-links">
             <span class="nav-link-item">Home</span>
             <span class="nav-link-item">Sobre Nós</span>
@@ -225,8 +204,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Sidebar com Logo em Fonte Chomsky e Menu
-st.sidebar.markdown('<div class="brand-logo">Rokfy</div>', unsafe_allow_html=True)
+# Sidebar com Logo
+st.sidebar.markdown('<div class="brand-logo-text">Rokfy</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="brand-tag">Gestão Integrada de Eventos</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="divider-line"></div>', unsafe_allow_html=True)
 
@@ -242,7 +221,7 @@ opcao = st.sidebar.radio(
     ]
 )
 
-# JANELA 1: HOME
+# 1. HOME
 if opcao == "Home / Apresentação":
     st.markdown(
         """
@@ -260,7 +239,7 @@ if opcao == "Home / Apresentação":
             """
             <div class="rokfy-card-modern">
                 <h3 style="color: #E05A47; margin-bottom: 8px;">Gestão Simplicada</h3>
-                <p style="font-size: 0.9rem; color: #666;">Crie eventos pagos ou gratuitos com controle exato de vagas, upload de banners e múltiplos meios de pagamento.</p>
+                <p style="font-size: 0.9rem; color: #555;">Crie eventos pagos ou gratuitos com controle exato de vagas, upload de banners e múltiplos meios de pagamento.</p>
             </div>
             """,
             unsafe_allow_html=True
@@ -270,7 +249,7 @@ if opcao == "Home / Apresentação":
             """
             <div class="rokfy-card-modern">
                 <h3 style="color: #E05A47; margin-bottom: 8px;">Certificação em Lote</h3>
-                <p style="font-size: 0.9rem; color: #666;">Anexe planilhas CSV e gerencie chancela digital para participantes, organizadores, palestrantes e comissão.</p>
+                <p style="font-size: 0.9rem; color: #555;">Anexe planilhas CSV e gerencie chancela digital para participantes, organizadores, palestrantes e comissão.</p>
             </div>
             """,
             unsafe_allow_html=True
@@ -280,13 +259,13 @@ if opcao == "Home / Apresentação":
             """
             <div class="rokfy-card-modern">
                 <h3 style="color: #E05A47; margin-bottom: 8px;">Anais & Repositório</h3>
-                <p style="font-size: 0.9rem; color: #666;">Publique os anais dos seus eventos com código ISSN/ISBN e repositório de artigos integrado.</p>
+                <p style="font-size: 0.9rem; color: #555;">Publique os anais dos seus eventos com código ISSN/ISBN e repositório de artigos integrado.</p>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-# JANELA 2: CRIAR EVENTO
+# 2. CRIAR EVENTO
 elif opcao == "Criar e Configurar Evento":
     st.markdown(
         """
@@ -342,9 +321,9 @@ elif opcao == "Criar e Configurar Evento":
             else:
                 st.error("Informe o nome do evento.")
 
-# JANELA 3: EVENTOS CADASTRADOS
+# 3. EVENTOS CADASTRADOS
 elif opcao == "Eventos Cadastrados":
-    st.markdown("<h2>Eventos Ativos</h2>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-card'><h1>Eventos Ativos</h1><p>Eventos disponíveis no sistema.</p></div>", unsafe_allow_html=True)
     cols = st.columns(2)
     for idx, ev in enumerate(st.session_state["eventos"]):
         with cols[idx % 2]:
@@ -363,9 +342,9 @@ elif opcao == "Eventos Cadastrados":
                 unsafe_allow_html=True
             )
 
-# JANELA 4: ANAIS DE EVENTOS (CONDICIONADO)
+# 4. ANAIS DE EVENTOS (CONDICIONADO)
 elif opcao == "Anais de Eventos":
-    st.markdown("<h2>Anais de Eventos</h2>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-card'><h1>Anais de Eventos</h1><p>Publicação acadêmica.</p></div>", unsafe_allow_html=True)
     if not st.session_state["eventos"]:
         st.warning("É necessário cadastrar um evento antes de criar os Anais.")
     else:
@@ -378,9 +357,9 @@ elif opcao == "Anais de Eventos":
             st.success("Anais vinculados e publicados com sucesso!")
         st.markdown("</div>", unsafe_allow_html=True)
 
-# JANELA 5: EMISSÃO DE CERTIFICADOS
+# 5. EMISSÃO DE CERTIFICADOS
 elif opcao == "Emissão de Certificados":
-    st.markdown("<h2>Emissão e Validação de Certificados</h2>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-card'><h1>Gerador de Certificados</h1><p>Emissão e validação digital.</p></div>", unsafe_allow_html=True)
     col_c1, col_c2 = st.columns([1, 1])
     
     with col_c1:
@@ -398,8 +377,8 @@ elif opcao == "Emissão de Certificados":
         st.markdown(
             f"""
             <div class="cert-container">
-                <div class="cert-title-chomsky">Certificado Oficial</div>
-                <div style="color: #E05A47; font-weight: 800; font-size: 0.8rem; letter-spacing: 2px; margin-bottom: 20px;">
+                <div class="brand-logo-text" style="font-size: 2.8rem !important;">Certificado</div>
+                <div style="color: #E05A47; font-weight: 800; font-size: 0.8rem; letter-spacing: 2px; margin: 15px 0;">
                     ROKFY PLATFORM • {mod_cert.upper()}
                 </div>
                 <p style="font-size: 0.95rem; color: #333; line-height: 1.6;">
@@ -411,7 +390,7 @@ elif opcao == "Emissão de Certificados":
             unsafe_allow_html=True
         )
 
-# JANELA 6: SOBRE NÓS / QUEM SOMOS / CONTATO
+# 6. SOBRE NÓS / QUEM SOMOS / CONTATO
 elif opcao == "Sobre Nós / Contato":
     st.markdown(
         """
