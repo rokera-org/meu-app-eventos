@@ -1,10 +1,9 @@
 import streamlit as st
 import pandas as pd
-import time
 
 st.set_page_config(page_title="Rokfy — Plataforma de Eventos", layout="wide")
 
-# Inicialização do Estado Global
+# Estado Global
 if "eventos" not in st.session_state:
     st.session_state["eventos"] = [
         {
@@ -19,12 +18,12 @@ if "eventos" not in st.session_state:
         }
     ]
 
-# Estilização CSS com Fonte Chomsky Local, Chapa Salmão e Ícone ☰
+# Estilização CSS: Fundo Bege + Shapes Orgânicos Salmão (Ondas Fluidas)
 custom_css = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
-    /* Tentar carregar Chomsky instalada no computador local */
+    /* Tentar fonte Chomsky local do computador */
     @font-face {
         font-family: 'Chomsky';
         src: local('Chomsky'), local('Chomsky Regular'), local('Chomsky-Regular');
@@ -32,22 +31,21 @@ custom_css = """
         font-style: normal;
     }
 
-    /* Fundo da Aplicação em Chapa Salmão Vibrante */
+    /* Fundo Global em Bege Editorial Conforme Combinado */
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
-        background-color: #FA8072 !important; /* Chapa Salmão */
+        background-color: #FAF6EE !important; /* Bege Claro Editorial */
         color: #1A1A1A !important;
     }
 
     .stApp {
-        background-color: #FA8072 !important;
+        background-color: #FAF6EE !important;
     }
 
-    /* Ocultar Setas << / >> da Sidebar e Injetar ☰ (3 Traços) */
+    /* Ícone do Menu Hambúrguer (Substitui as setas << >>) */
     button[data-testid="stSidebarCollapseButton"] svg,
     button[aria-label="Close sidebar"] svg,
-    button[aria-label="Open sidebar"] svg,
-    [data-testid="stSidebarNav"] button svg {
+    button[aria-label="Open sidebar"] svg {
         display: none !important;
     }
 
@@ -62,41 +60,12 @@ custom_css = """
         line-height: 1 !important;
     }
 
-    /* Top Navigation Bar */
-    .top-navbar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #FFFFFF;
-        padding: 16px 30px;
-        border-radius: 16px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-        margin-bottom: 25px;
-    }
-
-    .nav-links {
-        display: flex;
-        gap: 24px;
-    }
-
-    .nav-link-item {
-        color: #333333;
-        font-weight: 700;
-        font-size: 0.92rem;
-        cursor: pointer;
-    }
-
-    .nav-link-item:hover {
-        color: #E05A47;
-    }
-
     /* Sidebar */
     [data-testid="stSidebar"] {
-        background-color: #FFF8F6 !important;
-        border-right: 2px solid #EAE0DE !important;
+        background-color: #F3ECE0 !important;
+        border-right: 1px solid #E5DBD0 !important;
     }
 
-    /* Texto do Logo usando Chomsky com Fallback Gótico */
     .brand-logo-text {
         font-family: 'Chomsky', 'UnifrakturMaguntia', 'Old English Text MT', serif !important;
         font-size: 3.8rem !important;
@@ -105,11 +74,9 @@ custom_css = """
         margin: 0;
         padding: 0;
         line-height: 0.9;
-        letter-spacing: -1px;
     }
 
     .brand-tag {
-        font-family: 'Plus Jakarta Sans', sans-serif !important;
         font-size: 0.65rem !important;
         font-weight: 800 !important;
         letter-spacing: 3px !important;
@@ -120,68 +87,60 @@ custom_css = """
         margin-bottom: 20px;
     }
 
-    .divider-line {
-        height: 2px;
-        background: #E05A47;
-        opacity: 0.2;
-        margin: 15px 0 25px 0;
-    }
-
-    /* Cards e Containers */
-    .hero-card {
+    /* Navbar Superior */
+    .top-navbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         background: #FFFFFF;
-        border-radius: 20px;
-        padding: 36px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        padding: 14px 28px;
+        border-radius: 14px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
         margin-bottom: 25px;
     }
 
-    .hero-card h1 {
-        font-size: 2.1rem !important;
-        font-weight: 800 !important;
-        color: #1A1A1A !important;
-        margin-bottom: 8px !important;
+    /* Shape Orgânico Salmão Flutuante (Onda Fluida de Ponta a Ponta) */
+    .shape-container-top {
+        width: 100%;
+        background-color: #FA8072;
+        border-radius: 24px 24px 0 0;
+        padding: 35px 35px 15px 35px;
+        color: #FFFFFF !important;
+        position: relative;
     }
 
-    .hero-card p {
-        font-size: 1rem !important;
-        color: #555555 !important;
-        margin: 0 !important;
+    .shape-container-top h1, .shape-container-top p {
+        color: #FFFFFF !important;
     }
 
-    .rokfy-card-modern {
+    /* Wave SVG que conecta o Shape Salmão ao Fundo Bege */
+    .wave-divider {
+        width: 100%;
+        height: 60px;
+        margin-bottom: 25px;
+    }
+
+    .wave-divider path {
+        fill: #FA8072;
+    }
+
+    /* Cards e Containers Brancos */
+    .rokfy-card {
         background: #FFFFFF;
-        border-radius: 18px;
-        padding: 28px;
-        box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+        border-radius: 16px;
+        padding: 26px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+        border: 1px solid #EAE0D5;
         margin-bottom: 20px;
     }
 
-    /* Botões */
     .stButton>button {
         background-color: #E05A47 !important;
         color: #ffffff !important;
         border: none !important;
         border-radius: 10px !important;
         font-weight: 700 !important;
-        font-size: 0.9rem !important;
         padding: 0.65rem 1.6rem !important;
-        box-shadow: 0 4px 12px rgba(224, 90, 71, 0.3) !important;
-    }
-
-    .stButton>button:hover {
-        background-color: #C84B39 !important;
-        transform: translateY(-1px);
-    }
-
-    /* Moldura para Certificado */
-    .cert-container {
-        background: #FFFFFF;
-        border-radius: 20px;
-        padding: 35px;
-        border: 3px solid #1A1A1A;
-        text-align: center;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     }
 </style>
 """
@@ -192,12 +151,12 @@ st.markdown(custom_css, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="top-navbar">
-        <div style="font-weight: 800; font-size: 1.1rem; color: #E05A47; letter-spacing: 1px;">ROKFY PLATFORM</div>
-        <div class="nav-links">
-            <span class="nav-link-item">Home</span>
-            <span class="nav-link-item">Sobre Nós</span>
-            <span class="nav-link-item">Quem Somos</span>
-            <span class="nav-link-item">Contato</span>
+        <div style="font-weight: 800; font-size: 1.1rem; color: #E05A47;">ROKFY PLATFORM</div>
+        <div style="display:flex; gap:20px; font-weight:600; font-size:0.9rem;">
+            <span>Home</span>
+            <span>Sobre Nós</span>
+            <span>Quem Somos</span>
+            <span>Contato</span>
         </div>
     </div>
     """,
@@ -207,10 +166,9 @@ st.markdown(
 # Sidebar com Logo
 st.sidebar.markdown('<div class="brand-logo-text">Rokfy</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="brand-tag">Gestão Integrada de Eventos</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div class="divider-line"></div>', unsafe_allow_html=True)
 
 opcao = st.sidebar.radio(
-    "Navegação do Sistema",
+    "Navegação",
     [
         "Home / Apresentação",
         "Criar e Configurar Evento",
@@ -221,211 +179,89 @@ opcao = st.sidebar.radio(
     ]
 )
 
-# 1. HOME
-if opcao == "Home / Apresentação":
+# Renderização do Shape Irregular Salmão (Topo Curvado que se funde ao bege)
+def render_header_shape(titulo, sub-titulo):
     st.markdown(
-        """
-        <div class="hero-card">
-            <h1>Plataforma Completa para Gestão de Eventos e Festivais</h1>
-            <p>Gerencie inscrições, bilhetagem com pagamento via PIX e Cartão, emissão em lote de certificados e anais acadêmicos em uma única experiência.</p>
+        f"""
+        <div class="shape-container-top">
+            <h1 style="margin:0;">{titulo}</h1>
+            <p style="margin-top:5px; opacity: 0.9;">{sub-titulo}</p>
         </div>
+        <svg class="wave-divider" viewBox="0 0 1440 320" preserveAspectRatio="none">
+            <path d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,133.3C672,139,768,181,864,186.7C960,192,1056,160,1152,138.7C1248,117,1344,107,1392,101.3L1440,96L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path>
+        </svg>
         """,
         unsafe_allow_html=True
     )
+
+# 1. HOME
+if opcao == "Home / Apresentação":
+    render_header_shape("Plataforma Completa de Eventos", "Gestão de inscrições, emissão de certificados e publicação de anais.")
     
-    col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1:
-        st.markdown(
-            """
-            <div class="rokfy-card-modern">
-                <h3 style="color: #E05A47; margin-bottom: 8px;">Gestão Simplicada</h3>
-                <p style="font-size: 0.9rem; color: #555;">Crie eventos pagos ou gratuitos com controle exato de vagas, upload de banners e múltiplos meios de pagamento.</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    with col_f2:
-        st.markdown(
-            """
-            <div class="rokfy-card-modern">
-                <h3 style="color: #E05A47; margin-bottom: 8px;">Certificação em Lote</h3>
-                <p style="font-size: 0.9rem; color: #555;">Anexe planilhas CSV e gerencie chancela digital para participantes, organizadores, palestrantes e comissão.</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    with col_f3:
-        st.markdown(
-            """
-            <div class="rokfy-card-modern">
-                <h3 style="color: #E05A47; margin-bottom: 8px;">Anais & Repositório</h3>
-                <p style="font-size: 0.9rem; color: #555;">Publique os anais dos seus eventos com código ISSN/ISBN e repositório de artigos integrado.</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.markdown('<div class="rokfy-card"><h3>Gestão de Eventos</h3><p style="color:#666;">Crie e gerencie eventos com ingressos pagos via PIX e cartão.</p></div>', unsafe_allow_html=True)
+    with col_b:
+        st.markdown('<div class="rokfy-card"><h3>Certificação</h3><p style="color:#666;">Emissão em lote para palestrantes, organizadores e inscritos.</p></div>', unsafe_allow_html=True)
+    with col_c:
+        st.markdown('<div class="rokfy-card"><h3>Anais & ISSN</h3><p style="color:#666;">Repositório completo para artigos e volumes acadêmicos.</p></div>', unsafe_allow_html=True)
 
 # 2. CRIAR EVENTO
 elif opcao == "Criar e Configurar Evento":
-    st.markdown(
-        """
-        <div class="hero-card">
-            <h1>Criar Novo Evento</h1>
-            <p>Preencha os dados básicos, limites de vagas e meios de recebimento.</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    render_header_shape("Novo Evento", "Preencha as configurações e meios de pagamento.")
     
     with st.form(key="form_criar_evento"):
         c1, c2 = st.columns([2, 1])
         with c1:
-            nome_ev = st.text_input("Nome do Evento", placeholder="Ex: Rokfy Innovation Summit 2026")
-            desc_ev = st.text_area("Descrição do Evento", placeholder="Apresentação do evento e programação...")
+            nome_ev = st.text_input("Nome do Evento")
+            desc_ev = st.text_area("Descrição")
         with c2:
-            cat_ev = st.selectbox("Categoria", ["Congresso", "Festival / Show", "Simpósio", "Workshop"])
-            vagas_ev = st.number_input("Limite de Vagas", min_value=10, max_value=50000, value=500)
-            data_ev = st.date_input("Data de Realização")
-            local_ev = st.text_input("Localização / Link", placeholder="Ex: Centro de Convenções")
-
-        banner_file = st.file_uploader("Upload de Banner / Imagem Principal", type=["png", "jpg", "jpeg"])
-        
-        tipo_ev = st.radio("Modelo de Evento:", ["Gratuito", "Pago"])
-        preco_ev = 0.0
-        meios = []
-        
-        if tipo_ev == "Pago":
-            cp1, cp2 = st.columns([1, 2])
-            with cp1:
-                preco_ev = st.number_input("Preço do Ingresso (R$)", min_value=1.0, value=150.0)
-            with cp2:
-                st.write("Opções de Pagamento:")
-                if st.checkbox("PIX", value=True): meios.append("PIX")
-                if st.checkbox("Cartão de Crédito", value=True): meios.append("Cartão de Crédito")
-                if st.checkbox("Boleto Bancário"): meios.append("Boleto Bancário")
-                if st.checkbox("Transferência Bancária"): meios.append("Transferência Bancária")
-
-        if st.form_submit_button("Publicar Evento"):
+            cat_ev = st.selectbox("Categoria", ["Congresso", "Festival / Show", "Simpósio"])
+            vagas_ev = st.number_input("Limite de Vagas", value=300)
+            data_ev = st.date_input("Data")
+            
+        if st.form_submit_button("Salvar Evento"):
             if nome_ev:
-                st.session_state["eventos"].append({
-                    "nome": nome_ev,
-                    "categoria": cat_ev,
-                    "vagas": vagas_ev,
-                    "data": str(data_ev),
-                    "local": local_ev,
-                    "tipo": tipo_ev,
-                    "preco": preco_ev,
-                    "pagamentos": meios
-                })
-                st.success(f"Evento '{nome_ev}' cadastrado com sucesso!")
-            else:
-                st.error("Informe o nome do evento.")
+                st.session_state["eventos"].append({"nome": nome_ev, "categoria": cat_ev, "vagas": vagas_ev, "data": str(data_ev), "local": "Auditório", "tipo": "Gratuito", "preco": 0.0, "pagamentos": []})
+                st.success("Evento salvo!")
 
 # 3. EVENTOS CADASTRADOS
 elif opcao == "Eventos Cadastrados":
-    st.markdown("<div class='hero-card'><h1>Eventos Ativos</h1><p>Eventos disponíveis no sistema.</p></div>", unsafe_allow_html=True)
+    render_header_shape("Eventos Cadastrados", "Lista de eventos cadastrados no sistema.")
     cols = st.columns(2)
     for idx, ev in enumerate(st.session_state["eventos"]):
         with cols[idx % 2]:
-            st.markdown(
-                f"""
-                <div class="rokfy-card-modern">
-                    <span style="background: #FDF0ED; color: #E05A47; font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 6px;">{ev['categoria']}</span>
-                    <h3 style="margin-top: 10px;">{ev['nome']}</h3>
-                    <p style="font-size: 0.9rem; color: #555;">
-                        <b>Data:</b> {ev['data']} | <b>Vagas:</b> {ev['vagas']}<br>
-                        <b>Local:</b> {ev['local']}<br>
-                        <b>Valor:</b> {f'R$ {ev["preco"]:.2f}' if ev['tipo'] == 'Pago' else 'Gratuito'}
-                    </p>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            st.markdown(f'<div class="rokfy-card"><h3>{ev["nome"]}</h3><p>{ev["categoria"]} • {ev["vagas"]} vagas</p></div>', unsafe_allow_html=True)
 
-# 4. ANAIS DE EVENTOS (CONDICIONADO)
+# 4. ANAIS DE EVENTOS
 elif opcao == "Anais de Eventos":
-    st.markdown("<div class='hero-card'><h1>Anais de Eventos</h1><p>Publicação acadêmica.</p></div>", unsafe_allow_html=True)
+    render_header_shape("Anais de Eventos", "Publicação e indexação de volumes acadêmicos.")
     if not st.session_state["eventos"]:
-        st.warning("É necessário cadastrar um evento antes de criar os Anais.")
+        st.warning("Cadastre um evento primeiro para poder publicar anais.")
     else:
-        st.markdown("<div class='rokfy-card-modern'>", unsafe_allow_html=True)
-        ev_sel = st.selectbox("Selecione o Evento:", [e["nome"] for e in st.session_state["eventos"]])
-        titulo_anais = st.text_input("Título dos Anais", value=f"Anais Oficiais - {ev_sel}")
-        issn = st.text_input("ISSN / ISBN", placeholder="Ex: 2447-8821")
-        file_anais = st.file_uploader("Arquivo PDF dos Anais", type=["pdf"])
+        st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
+        st.selectbox("Evento Vinculado", [e["nome"] for e in st.session_state["eventos"]])
+        st.text_input("ISSN / ISBN")
+        st.file_uploader("Upload PDF dos Anais", type=["pdf"])
         if st.button("Publicar Anais"):
-            st.success("Anais vinculados e publicados com sucesso!")
-        st.markdown("</div>", unsafe_allow_html=True)
+            st.success("Anais publicados!")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# 5. EMISSÃO DE CERTIFICADOS
+# 5. CERTIFICADOS
 elif opcao == "Emissão de Certificados":
-    st.markdown("<div class='hero-card'><h1>Gerador de Certificados</h1><p>Emissão e validação digital.</p></div>", unsafe_allow_html=True)
-    col_c1, col_c2 = st.columns([1, 1])
-    
-    with col_c1:
-        st.markdown("<div class='rokfy-card-modern'>", unsafe_allow_html=True)
-        mod_cert = st.selectbox("Modalidade", ["Participante", "Organizador", "Comissão Científica", "Palestrante", "Ministrante de Curso"])
-        nome_p = st.text_input("Nome do Contemplado", "Carlos Eduardo Lima")
-        ev_cert = st.selectbox("Evento Vinculado", [e["nome"] for e in st.session_state["eventos"]])
-        horas = st.number_input("Carga Horária", value=20)
-        st.file_uploader("Anexar Planilha para Emissão em Lote (.CSV)", type=["csv"])
-        if st.button("Gerar Certificado"):
-            st.success("Certificado gerado com sucesso!")
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-    with col_c2:
-        st.markdown(
-            f"""
-            <div class="cert-container">
-                <div class="brand-logo-text" style="font-size: 2.8rem !important;">Certificado</div>
-                <div style="color: #E05A47; font-weight: 800; font-size: 0.8rem; letter-spacing: 2px; margin: 15px 0;">
-                    ROKFY PLATFORM • {mod_cert.upper()}
-                </div>
-                <p style="font-size: 0.95rem; color: #333; line-height: 1.6;">
-                    Certificamos que <b>{nome_p}</b> participou na condição de <b>{mod_cert}</b> do evento 
-                    <b>"{ev_cert}"</b>, totalizando a carga horária de <b>{horas} horas</b>.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    render_header_shape("Emissão de Certificados", "Gere certificados individuais ou via planilha CSV.")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
+        st.selectbox("Modalidade", ["Participante", "Organizador", "Comissão Científica", "Palestrante", "Ministrante de Curso"])
+        st.text_input("Nome", "Carlos Silva")
+        st.file_uploader("Importar Planilha CSV (Lote)", type=["csv"])
+        if st.button("Gerar Certificados"):
+            st.success("Certificados gerados com sucesso!")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# 6. SOBRE NÓS / QUEM SOMOS / CONTATO
+# 6. SOBRE NÓS
 elif opcao == "Sobre Nós / Contato":
-    st.markdown(
-        """
-        <div class="hero-card">
-            <h1>Sobre a Rokfy</h1>
-            <p>A Rokfy é uma plataforma de tecnologia voltada para a curadoria, gestão e publicação de eventos com atitude.</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    render_header_shape("Sobre a Rokfy", "Conheça mais sobre nossa solução.")
+    st.markdown('<div class="rokfy-card"><h3>Quem Somos</h3><p>Plataforma para gestão de eventos acadêmicos e culturais.</p></div>', unsafe_allow_html=True)
     
-    col_info1, col_info2 = st.columns(2)
-    with col_info1:
-        st.markdown(
-            """
-            <div class="rokfy-card-modern">
-                <h3>Quem Somos</h3>
-                <p style="color: #555; font-size: 0.95rem;">
-                    Nossa missão é simplificar a gestão de festivais, simpósios e congressos acadêmicos, oferecendo ferramentas robustas para organizadores e uma experiência fluida para os participantes.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    with col_info2:
-        st.markdown(
-            """
-            <div class="rokfy-card-modern">
-                <h3>Entre em Contato</h3>
-                <p style="color: #555; font-size: 0.95rem;">
-                    <b>Atendimento:</b> contato@rokfy.com.br<br>
-                    <b>Suporte ao Organizador:</b> +55 (11) 99999-8888<br>
-                    <b>Atendimento Comercial:</b> Segunda a Sexta, das 09h às 18h.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
