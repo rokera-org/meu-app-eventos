@@ -2,5 +2,6 @@ streamlit
 pandas
 reportlab
 python-pptx
+python-docx
 pillow
 openpyxl
