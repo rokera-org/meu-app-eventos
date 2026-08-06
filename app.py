@@ -179,13 +179,13 @@ opcao = st.sidebar.radio(
     ]
 )
 
-# Renderização do Shape Irregular Salmão (Topo Curvado que se funde ao bege)
-def render_header_shape(titulo, sub-titulo):
+# Renderização do Shape Irregular Salmão (Com parâmetro corrigido sub_titulo)
+def render_header_shape(titulo, sub_titulo):
     st.markdown(
         f"""
         <div class="shape-container-top">
             <h1 style="margin:0;">{titulo}</h1>
-            <p style="margin-top:5px; opacity: 0.9;">{sub-titulo}</p>
+            <p style="margin-top:5px; opacity: 0.9;">{sub_titulo}</p>
         </div>
         <svg class="wave-divider" viewBox="0 0 1440 320" preserveAspectRatio="none">
             <path d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,133.3C672,139,768,181,864,186.7C960,192,1056,160,1152,138.7C1248,117,1344,107,1392,101.3L1440,96L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path>
@@ -264,4 +264,3 @@ elif opcao == "Emissão de Certificados":
 elif opcao == "Sobre Nós / Contato":
     render_header_shape("Sobre a Rokfy", "Conheça mais sobre nossa solução.")
     st.markdown('<div class="rokfy-card"><h3>Quem Somos</h3><p>Plataforma para gestão de eventos acadêmicos e culturais.</p></div>', unsafe_allow_html=True)
-    
