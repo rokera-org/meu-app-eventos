@@ -10,7 +10,7 @@ import qrcode
 # Imports para geração de PDF com ReportLab
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 
@@ -33,7 +33,7 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Tabela de Usuários
+    # Tabela de Usuários com novos perfis
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,7 +44,7 @@ def init_db():
         )
     """)
     
-    # Tabela de Eventos
+    # Tabela de Eventos com campos configuráveis de inscrição
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS eventos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,7 +55,22 @@ def init_db():
             local TEXT,
             tipo TEXT NOT NULL,
             preco REAL,
-            pagamentos TEXT
+            pagamentos TEXT,
+            campos_formulario TEXT,
+            perguntas_extra TEXT
+        )
+    """)
+    
+    # Tabela de Inscritos
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS inscricoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            evento_id INTEGER,
+            usuario_id INTEGER,
+            dados_inscricao TEXT,
+            data_inscricao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (evento_id) REFERENCES eventos (id),
+            FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
         )
     """)
     
@@ -73,13 +88,13 @@ def init_db():
         )
     """)
     
-    # Admin Padrão
+    # Usuário Padrão Promotor/Organizador
     cursor.execute("SELECT COUNT(*) FROM usuarios")
     if cursor.fetchone()[0] == 0:
         cursor.execute("""
             INSERT INTO usuarios (nome, email, senha, perfil)
             VALUES (?, ?, ?, ?)
-        """, ("Admin Rokfy", "admin@rokfy.com", hash_senha("123456"), "Organizador"))
+        """, ("Promotor Rokfy", "admin@rokfy.com", hash_senha("123456"), "Promotor de Eventos"))
         
     conn.commit()
     conn.close()
@@ -97,9 +112,9 @@ def cadastrar_usuario(nome, email, senha, perfil):
         """, (nome, email, hash_senha(senha), perfil))
         conn.commit()
         conn.close()
-        return True, "Usuário cadastrado com sucesso!"
+        return True, "Cadastro realizado com sucesso."
     except sqlite3.IntegrityError:
-        return False, "E-mail já cadastrado."
+        return False, "E-mail ja cadastrado."
 
 def autenticar_usuario(email, senha):
     conn = get_db_connection()
@@ -109,13 +124,13 @@ def autenticar_usuario(email, senha):
     conn.close()
     return dict(user) if user else None
 
-def salvar_evento_db(nome, categoria, vagas, data, local, tipo, preco, pagamentos):
+def salvar_evento_db(nome, categoria, vagas, data, local, tipo, preco, pagamentos, campos_formulario, perguntas_extra):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO eventos (nome, categoria, vagas, data, local, tipo, preco, pagamentos)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (nome, categoria, vagas, str(data), local, tipo, preco, json.dumps(pagamentos)))
+        INSERT INTO eventos (nome, categoria, vagas, data, local, tipo, preco, pagamentos, campos_formulario, perguntas_extra)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (nome, categoria, vagas, str(data), local, tipo, preco, json.dumps(pagamentos), json.dumps(campos_formulario), json.dumps(perguntas_extra)))
     conn.commit()
     conn.close()
 
@@ -137,9 +152,21 @@ def listar_eventos_db():
             "local": r["local"],
             "tipo": r["tipo"],
             "preco": r["preco"],
-            "pagamentos": json.loads(r["pagamentos"]) if r["pagamentos"] else []
+            "pagamentos": json.loads(r["pagamentos"]) if r["pagamentos"] else [],
+            "campos_formulario": json.loads(r["campos_formulario"]) if r["campos_formulario"] else [],
+            "perguntas_extra": json.loads(r["perguntas_extra"]) if r["perguntas_extra"] else []
         })
     return eventos
+
+def salvar_inscricao_db(evento_id, usuario_id, dados_inscricao):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO inscricoes (evento_id, usuario_id, dados_inscricao)
+        VALUES (?, ?, ?)
+    """, (evento_id, usuario_id, json.dumps(dados_inscricao)))
+    conn.commit()
+    conn.close()
 
 def salvar_certificado_db(evento_id, nome, modalidade, horas):
     codigo = str(uuid.uuid4()).split('-')[0].upper()
@@ -167,7 +194,7 @@ def listar_certificados_usuario(nome_participante):
     return [dict(r) for r in rows]
 
 # ==========================================
-# 2. MOTOR DE GERAÇÃO DE PDF (PASSO 3)
+# 2. MOTOR DE GERAÇÃO DE PDF
 # ==========================================
 def gerar_pdf_certificado(nome_participante, evento_nome, modalidade, horas, codigo_validacao):
     buffer = io.BytesIO()
@@ -184,9 +211,9 @@ def gerar_pdf_certificado(nome_participante, evento_nome, modalidade, horas, cod
         'TitleStyle',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=32,
-        textColor=colors.HexColor('#E05A47'),
-        alignment=1, # Centralizado
+        fontSize=30,
+        textColor=colors.HexColor('#6C5CE7'),
+        alignment=1,
         spaceAfter=20
     )
     
@@ -194,10 +221,10 @@ def gerar_pdf_certificado(nome_participante, evento_nome, modalidade, horas, cod
         'BodyStyle',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=16,
-        leading=24,
+        fontSize=15,
+        leading=22,
         alignment=1,
-        textColor=colors.HexColor('#1A1A1A')
+        textColor=colors.HexColor('#2D3436')
     )
     
     style_codigo = ParagraphStyle(
@@ -206,31 +233,30 @@ def gerar_pdf_certificado(nome_participante, evento_nome, modalidade, horas, cod
         fontName='Helvetica-Oblique',
         fontSize=10,
         alignment=1,
-        textColor=colors.HexColor('#666666')
+        textColor=colors.HexColor('#636E72')
     )
 
     story = []
     story.append(Spacer(1, 0.8*inch))
-    story.append(Paragraph("CERTIFICADO DE PARTICIPAÇÃO", style_titulo))
+    story.append(Paragraph("CERTIFICADO DE PARTICIPACAO", style_titulo))
     story.append(Spacer(1, 0.3*inch))
     
     texto_certificado = f"""
     Certificamos que <b>{nome_participante.upper()}</b> participou do evento 
-    <b>{evento_nome}</b> na qualidade de <b>{modalidade}</b>, 
-    cumprindo uma carga horária total de <b>{horas} horas</b>.
+    <b>{evento_nome}</b> na categoria de <b>{modalidade.upper()}</b>, 
+    com carga horaria total de <b>{horas} horas</b>.
     """
     story.append(Paragraph(texto_certificado, style_corpo))
     story.append(Spacer(1, 0.6*inch))
-    story.append(Paragraph(f"Chancela de Autenticidade Digital: <b>{codigo_validacao}</b> | Emitido pela Plataforma Rokfy", style_codigo))
+    story.append(Paragraph(f"Autenticacao Digital: <b>{codigo_validacao}</b> | Plataforma Rokfy Eventos", style_codigo))
     
-    # Moldura decorativa
     def desenhar_moldura(canvas, doc):
         canvas.saveState()
-        canvas.setStrokeColor(colors.HexColor('#FA8072'))
+        canvas.setStrokeColor(colors.HexColor('#6C5CE7'))
         canvas.setLineWidth(4)
         canvas.rect(20, 20, doc.pagesize[0] - 40, doc.pagesize[1] - 40)
-        canvas.setStrokeColor(colors.HexColor('#E05A47'))
-        canvas.setLineWidth(1)
+        canvas.setStrokeColor(colors.HexColor('#FD79A8'))
+        canvas.setLineWidth(1.5)
         canvas.rect(25, 25, doc.pagesize[0] - 50, doc.pagesize[1] - 50)
         canvas.restoreState()
 
@@ -239,7 +265,7 @@ def gerar_pdf_certificado(nome_participante, evento_nome, modalidade, horas, cod
     return buffer
 
 # ==========================================
-# 3. MÓDULO DE PAGAMENTO PIX (PASSO 4)
+# 3. PAGAMENTO PIX
 # ==========================================
 def gerar_qr_code_pix(chave_payload):
     qr = qrcode.QRCode(version=1, box_size=6, border=2)
@@ -253,277 +279,448 @@ def gerar_qr_code_pix(chave_payload):
     return buf
 
 # ==========================================
-# 4. DESIGN CSS
+# 4. DESIGN CSS JOVIAL & ANIMADO (SEM EMOJIS)
 # ==========================================
 custom_css = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-
-    @font-face {
-        font-family: 'Chomsky';
-        src: local('Chomsky'), local('Chomsky Regular'), local('Chomsky-Regular');
-        font-weight: normal; font-style: normal;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
 
     html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
-        background-color: #FAF6EE !important; color: #1A1A1A !important;
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        background-color: #0F172A !important;
+        color: #F8FAFC !important;
     }
-    .stApp { background-color: #FAF6EE !important; }
-
-    button[data-testid="stSidebarCollapseButton"] svg, button[aria-label="Close sidebar"] svg, button[aria-label="Open sidebar"] svg { display: none !important; }
-    button[data-testid="stSidebarCollapseButton"]::after, button[aria-label="Close sidebar"]::after, button[aria-label="Open sidebar"]::after {
-        content: "☰" !important; font-size: 1.5rem !important; font-weight: 800 !important; color: #1A1A1A !important; display: block !important; line-height: 1 !important;
+    .stApp {
+        background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 100%) !important;
     }
 
-    [data-testid="stSidebar"] { background-color: #F3ECE0 !important; border-right: 1px solid #E5DBD0 !important; }
-    .brand-logo-text { font-family: 'Chomsky', 'UnifrakturMaguntia', serif !important; font-size: 3.8rem !important; color: #E05A47 !important; text-align: center; margin: 0; line-height: 0.9; }
-    .brand-tag { font-size: 0.65rem !important; font-weight: 800 !important; letter-spacing: 3px !important; color: #1A1A1A !important; text-transform: uppercase; text-align: center; margin-top: 10px; margin-bottom: 20px; }
+    [data-testid="stSidebar"] {
+        background-color: #18181B !important;
+        border-right: 1px solid #27272A !important;
+    }
 
-    .top-navbar { display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; padding: 14px 28px; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 25px; }
-    .shape-container-top { width: 100%; background-color: #FA8072; border-radius: 24px 24px 0 0; padding: 35px 35px 15px 35px; color: #FFFFFF !important; position: relative; }
-    .shape-container-top h1, .shape-container-top p { color: #FFFFFF !important; }
-    .wave-divider { width: 100%; height: 60px; margin-bottom: 25px; }
-    .wave-divider path { fill: #FA8072; }
-    .rokfy-card { background: #FFFFFF; border-radius: 16px; padding: 26px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); border: 1px solid #EAE0D5; margin-bottom: 20px; }
-    .stButton>button { background-color: #E05A47 !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; padding: 0.65rem 1.6rem !important; }
+    .brand-title {
+        font-size: 2.8rem !important;
+        font-weight: 800 !important;
+        background: linear-gradient(90deg, #A855F7 0%, #EC4899 50%, #F59E0B 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        letter-spacing: -1px;
+        margin: 0;
+    }
+    .brand-sub {
+        font-size: 0.75rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 2px !important;
+        color: #A1A1AA !important;
+        text-transform: uppercase;
+        text-align: center;
+        margin-bottom: 25px;
+    }
+
+    .hero-banner {
+        background: linear-gradient(135deg, #6366F1 0%, #A855F7 50%, #EC4899 100%);
+        border-radius: 20px;
+        padding: 35px;
+        color: #FFFFFF !important;
+        box-shadow: 0 10px 30px rgba(168, 85, 247, 0.3);
+        margin-bottom: 30px;
+        transition: transform 0.3s ease;
+    }
+    .hero-banner:hover {
+        transform: translateY(-3px);
+    }
+    .hero-banner h1 {
+        color: #FFFFFF !important;
+        font-weight: 800;
+        margin: 0;
+        font-size: 2.2rem;
+    }
+    .hero-banner p {
+        color: #F1F5F9 !important;
+        margin-top: 8px;
+        font-size: 1.05rem;
+    }
+
+    .rokfy-card {
+        background: #18181B;
+        border-radius: 16px;
+        padding: 24px;
+        border: 1px solid #27272A;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    .rokfy-card:hover {
+        border-color: #A855F7;
+        box-shadow: 0 6px 25px rgba(168, 85, 247, 0.2);
+    }
+
+    .stButton>button {
+        background: linear-gradient(90deg, #8B5CF6 0%, #EC4899 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 12px !important;
+        font-weight: 700 !important;
+        padding: 0.7rem 1.8rem !important;
+        transition: all 0.3s ease !important;
+    }
+    .stButton>button:hover {
+        transform: scale(1.02) !important;
+        box-shadow: 0 6px 20px rgba(236, 72, 153, 0.4) !important;
+    }
+
+    .stTextInput input, .stSelectbox select, .stNumberInput input, .stTextArea textarea {
+        background-color: #27272A !important;
+        color: #F8FAFC !important;
+        border-radius: 10px !important;
+        border: 1px solid #3F3F46 !important;
+    }
+
+    div[data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    button[data-baseweb="tab"] {
+        border-radius: 10px !important;
+        padding: 10px 20px !important;
+        background-color: #27272A !important;
+        color: #A1A1AA !important;
+        font-weight: 600 !important;
+    }
+    button[aria-selected="true"] {
+        background: linear-gradient(90deg, #8B5CF6 0%, #EC4899 100%) !important;
+        color: #FFFFFF !important;
+    }
 </style>
 """
 
 st.markdown(custom_css, unsafe_allow_html=True)
 
-def render_header_shape(titulo, sub_titulo):
+def render_hero(titulo, sub_titulo):
     st.markdown(
         f"""
-        <div class="shape-container-top">
-            <h1 style="margin:0;">{titulo}</h1>
-            <p style="margin-top:5px; opacity: 0.9;">{sub_titulo}</p>
+        <div class="hero-banner">
+            <h1>{titulo}</h1>
+            <p>{sub_titulo}</p>
         </div>
-        <svg class="wave-divider" viewBox="0 0 1440 320" preserveAspectRatio="none">
-            <path d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,133.3C672,139,768,181,864,186.7C960,192,1056,160,1152,138.7C1248,117,1344,107,1392,101.3L1440,96L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path>
-        </svg>
         """,
         unsafe_allow_html=True
     )
 
 # ==========================================
-# 5. CONTROLE DE SESSÃO & TELAS
+# 5. SESSÃO E NAVEGAÇÃO
 # ==========================================
 if "usuario_logado" not in st.session_state:
     st.session_state["usuario_logado"] = None
 
 if st.session_state["usuario_logado"] is None:
-    render_header_shape("Acesse o Rokfy", "Faça login ou crie sua conta para acessar o sistema.")
+    render_hero("Plataforma Rokfy", "Entre na sua conta ou cadastre-se para participar de eventos.")
     
-    tab_login, tab_registro = st.tabs(["🔒 Entrar no Sistema", "📝 Criar Nova Conta"])
+    tab_login, tab_registro = st.tabs(["Acessar Conta", "Criar Nova Conta"])
     
     with tab_login:
         st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
         email_login = st.text_input("E-mail", key="login_email")
         senha_login = st.text_input("Senha", type="password", key="login_senha")
         
-        if st.button("Acessar Conta"):
+        if st.button("Entrar no Sistema"):
             user = autenticar_usuario(email_login, senha_login)
             if user:
                 st.session_state["usuario_logado"] = user
-                st.success(f"Bem-vindo(a), {user['nome']}!")
+                st.success(f"Bem-vindo, {user['nome']}")
                 st.rerun()
             else:
                 st.error("E-mail ou senha incorretos.")
-        st.info("💡 **Dica de Teste Admin:** `admin@rokfy.com` | Senha: `123456`")
+        st.info("Conta de teste do Promotor: admin@rokfy.com | Senha: 123456")
         st.markdown('</div>', unsafe_allow_html=True)
         
     with tab_registro:
         st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
         nome_reg = st.text_input("Nome Completo")
-        email_reg = st.text_input("E-mail")
+        email_reg = st.text_input("E-mail para Cadastro")
         senha_reg = st.text_input("Crie uma Senha", type="password")
-        perfil_reg = st.selectbox("Tipo de Conta", ["Participante", "Organizador"])
+        perfil_reg = st.selectbox("Perfil da Conta", [
+            "Participante", 
+            "Promotor de Eventos", 
+            "Organizador", 
+            "Avaliador / Comissão"
+        ])
         
-        if st.button("Cadastrar Usuário"):
+        if st.button("Finalizar Cadastro"):
             if nome_reg and email_reg and senha_reg:
                 sucesso, msg = cadastrar_usuario(nome_reg, email_reg, senha_reg, perfil_reg)
                 if sucesso:
-                    st.success(msg + " Agora faça login.")
+                    st.success(msg + " Faça login para continuar.")
                 else:
                     st.error(msg)
             else:
-                st.error("Preencha todos os campos.")
+                st.error("Preencha todos os campos obrigatorios.")
         st.markdown('</div>', unsafe_allow_html=True)
 
 else:
     usuario = st.session_state["usuario_logado"]
     
-    st.markdown(
-        f"""
-        <div class="top-navbar">
-            <div style="font-weight: 800; font-size: 1.1rem; color: #E05A47;">ROKFY PLATFORM</div>
-            <div style="display:flex; align-items:center; gap:15px; font-weight:600; font-size:0.9rem;">
-                <span>Olá, <b>{usuario['nome']}</b> ({usuario['perfil']})</span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.sidebar.markdown('<div class="brand-logo-text">Rokfy</div>', unsafe_allow_html=True)
-    st.sidebar.markdown('<div class="brand-tag">Gestão Integrada de Eventos</div>', unsafe_allow_html=True)
-    
-    opcoes_menu = [
-        "Home / Apresentação",
-        "Criar e Configurar Evento",
-        "Eventos Cadastrados",
-        "Anais de Eventos",
-        "Emissão de Certificados",
-        "Sobre Nós / Contato"
-    ] if usuario["perfil"] == "Organizador" else [
-        "Home / Apresentação",
-        "Eventos Cadastrados",
-        "Emissão de Certificados",
-        "Sobre Nós / Contato"
-    ]
-        
-    opcao = st.sidebar.radio("Navegação", opcoes_menu)
+    st.sidebar.markdown('<div class="brand-title">Rokfy</div>', unsafe_allow_html=True)
+    st.sidebar.markdown('<div class="brand-sub">Gestao e Ingressos</div>', unsafe_allow_html=True)
+    st.sidebar.write(f"Usuario: **{usuario['nome']}**")
+    st.sidebar.write(f"Perfil: **{usuario['perfil']}**")
     st.sidebar.markdown("---")
-    if st.sidebar.button("🚪 Sair do Sistema"):
+    
+    # Menu baseado nos perfis
+    if usuario["perfil"] in ["Promotor de Eventos", "Organizador"]:
+        opcoes_menu = [
+            "Painel Geral",
+            "Criar e Editar Evento",
+            "Eventos Disponiveis",
+            "Gestao de Inscritos",
+            "Emissao de Certificados",
+            "Sobre a Rokfy"
+        ]
+    else:
+        opcoes_menu = [
+            "Painel Geral",
+            "Eventos Disponiveis",
+            "Emissao de Certificados",
+            "Sobre a Rokfy"
+        ]
+        
+    opcao = st.sidebar.radio("Navegacao Principal", opcoes_menu)
+    st.sidebar.markdown("---")
+    if st.sidebar.button("Sair da Conta"):
         st.session_state["usuario_logado"] = None
         st.rerun()
 
     eventos_db = listar_eventos_db()
 
-    # 1. HOME
-    if opcao == "Home / Apresentação":
-        render_header_shape("Plataforma Completa de Eventos", f"Painel de Controle de {usuario['nome']}.")
-        col_a, col_b, col_c = st.columns(3)
-        with col_a:
-            st.markdown('<div class="rokfy-card"><h3>Gestão de Ingressos</h3><p style="color:#666;">Inscrições instantâneas via PIX.</p></div>', unsafe_allow_html=True)
-        with col_b:
-            st.markdown('<div class="rokfy-card"><h3>Certificados em PDF</h3><p style="color:#666;">Download imediato com chancela digital.</p></div>', unsafe_allow_html=True)
-        with col_c:
-            st.markdown('<div class="rokfy-card"><h3>Anais & Repositório</h3><p style="color:#666;">Publicação oficial de conteúdos.</p></div>', unsafe_allow_html=True)
+    # ------------------------------------------
+    # 1. PAINEL GERAL
+    # ------------------------------------------
+    if opcao == "Painel Geral":
+        render_hero(f"Ola, {usuario['nome']}", "Acompanhe seus eventos, inscricoes e certificados em um so lugar.")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown('<div class="rokfy-card"><h3>Eventos Ativos</h3><p>Explore as oportunidades e inscricoes abertas.</p></div>', unsafe_allow_html=True)
+        with c2:
+            st.markdown('<div class="rokfy-card"><h3>Inscricao Flexivel</h3><p>Campos customizados definidos pelo promotor do evento.</p></div>', unsafe_allow_html=True)
+        with c3:
+            st.markdown('<div class="rokfy-card"><h3>Certificacao Rapida</h3><p>Emissao por perfil: participante, palestrante e mais.</p></div>', unsafe_allow_html=True)
 
-    # 2. CRIAR EVENTO
-    elif opcao == "Criar e Configurar Evento" and usuario["perfil"] == "Organizador":
-        render_header_shape("Novo Evento", "Preencha os dados do evento.")
+    # ------------------------------------------
+    # 2. CRIAR E EDITAR EVENTO (PROMOTOR / ORGANIZADOR)
+    # ------------------------------------------
+    elif opcao == "Criar e Editar Evento" and usuario["perfil"] in ["Promotor de Eventos", "Organizador"]:
+        render_hero("Configurador de Evento", "Defina as informacoes basicas e monte o formulario de inscricao perfeito.")
+        
         with st.form(key="form_criar_evento"):
-            c1, c2 = st.columns([2, 1])
-            with c1:
+            st.subheader("1. Informacoes Gerais do Evento")
+            col1, col2 = st.columns([2, 1])
+            with col1:
                 nome_ev = st.text_input("Nome do Evento")
-                desc_ev = st.text_area("Descrição")
-            with c2:
-                cat_ev = st.selectbox("Categoria", ["Congresso", "Festival / Show", "Simpósio", "Workshop"])
-                vagas_ev = st.number_input("Limite de Vagas", min_value=10, value=500)
-                data_ev = st.date_input("Data")
-                local_ev = st.text_input("Localização")
-                
-            tipo_ev = st.radio("Modelo de Evento:", ["Gratuito", "Pago"])
+                desc_ev = st.text_area("Descricao Completa")
+            with col2:
+                cat_ev = st.selectbox("Categoria", ["Congresso", "Workshop", "Simposio", "Show / Festival", "Curso / Bootcamp", "Encontro Tecnico"])
+                vagas_ev = st.number_input("Total de Vagas", min_value=1, value=200)
+                data_ev = st.date_input("Data do Evento")
+                local_ev = st.text_input("Local ou Link Online")
+
+            st.markdown("---")
+            st.subheader("2. Valor e Forma de Pagamento")
+            tipo_ev = st.radio("Modalidade de Ingressos:", ["Gratuito", "Pago"])
             preco_ev = 0.0
             meios = []
             if tipo_ev == "Pago":
                 cp1, cp2 = st.columns([1, 2])
                 with cp1:
-                    preco_ev = st.number_input("Preço do Ingresso (R$)", min_value=1.0, value=100.0)
+                    preco_ev = st.number_input("Preco do Ingresso (R$)", min_value=1.0, value=50.0)
                 with cp2:
-                    if st.checkbox("PIX", value=True): meios.append("PIX")
-                    if st.checkbox("Cartão de Crédito"): meios.append("Cartão de Crédito")
+                    if st.checkbox("Pix Instantaneo", value=True): meios.append("Pix")
+                    if st.checkbox("Cartao de Credito"): meios.append("Cartao de Credito")
 
-            if st.form_submit_button("Salvar Evento"):
+            st.markdown("---")
+            st.subheader("3. Personalizacao do Formulario de Inscricao")
+            st.write("Selecione os dados que o participante devera preencher ao se inscrever:")
+            
+            c_f1, c_f2, c_f3 = st.columns(3)
+            with c_f1:
+                req_nome = st.checkbox("Nome Completo", value=True, disabled=True)
+                req_email = st.checkbox("E-mail", value=True, disabled=True)
+            with c_f2:
+                req_cpf = st.checkbox("CPF")
+                req_tel = st.checkbox("Telefone / WhatsApp")
+            with c_f3:
+                req_registro = st.checkbox("Registro Profissional (OAB, CRM, CREA, etc.)")
+                req_inst = st.checkbox("Empresa ou Instituicao")
+
+            st.write("Adicionar Perguntas Customizadas (separadas por virgula):")
+            perguntas_extra_raw = st.text_input("Ex: Tamanho da Camiseta, Como soube do evento?, Restricao Alimentar")
+
+            if st.form_submit_button("Publicar Evento"):
                 if nome_ev:
-                    salvar_evento_db(nome_ev, cat_ev, vagas_ev, data_ev, local_ev, tipo_ev, preco_ev, meios)
-                    st.success("Evento salvo com sucesso!")
-                    st.rerun()
+                    campos_selecionados = ["Nome Completo", "E-mail"]
+                    if req_cpf: campos_selecionados.append("CPF")
+                    if req_tel: campos_selecionados.append("Telefone")
+                    if req_registro: campos_selecionados.append("Registro Profissional")
+                    if req_inst: campos_selecionados.append("Instituicao")
+                    
+                    p_extra = [p.strip() for p in perguntas_extra_raw.split(",") if p.strip()]
 
-    # 3. EVENTOS CADASTRADOS & PAGAMENTO PIX (PASSO 4)
-    elif opcao == "Eventos Cadastrados":
-        render_header_shape("Eventos Cadastrados", "Compre ingressos via PIX ou inscreva-se.")
+                    salvar_evento_db(nome_ev, cat_ev, vagas_ev, data_ev, local_ev, tipo_ev, preco_ev, meios, campos_selecionados, p_extra)
+                    st.success("Evento criado com sucesso!")
+                    st.rerun()
+                else:
+                    st.error("Informe pelo menos o nome do evento.")
+
+    # ------------------------------------------
+    # 3. EVENTOS DISPONÍVEIS & INSCRIÇÃO FLEXÍVEL
+    # ------------------------------------------
+    elif opcao == "Eventos Disponiveis":
+        render_hero("Eventos Abertos", "Inscreva-se nos eventos disponiveis na plataforma.")
+        
         if not eventos_db:
-            st.info("Nenhum evento disponível no momento.")
+            st.info("Nenhum evento cadastrado no momento.")
         else:
-            for idx, ev in enumerate(eventos_db):
-                st.markdown(f'<div class="rokfy-card">', unsafe_allow_html=True)
-                col_info, col_acao = st.columns([3, 2])
-                with col_info:
-                    st.markdown(f"### {ev['nome']}")
+            for ev in eventos_db:
+                st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
+                c_det, c_btn = st.columns([3, 1])
+                with c_det:
+                    st.subheader(ev['nome'])
                     st.write(f"**Categoria:** {ev['categoria']} | **Data:** {ev['data']} | **Local:** {ev['local']}")
-                    st.write(f"**Valor:** {'R$ {:.2f}'.format(ev['preco']) if ev['tipo'] == 'Pago' else 'Gratuito'}")
+                    st.write(f"**Ingresso:** {'R$ {:.2f}'.format(ev['preco']) if ev['tipo'] == 'Pago' else 'Gratuito'}")
                 
-                with col_acao:
-                    if ev['tipo'] == 'Pago':
-                        if st.button(f"Comprar Ingresso (R$ {ev['preco']:.2f})", key=f"buy_{ev['id']}"):
-                            st.session_state[f"pagando_{ev['id']}"] = True
-                            
-                        if st.session_state.get(f"pagando_{ev['id']}", False):
-                            st.write("---")
-                            st.subheader("Pagamento via PIX")
-                            
-                            # Simulação Payload Estático do PIX
+                with c_btn:
+                    if st.button("Inscrever-se", key=f"btn_inscr_{ev['id']}"):
+                        st.session_state[f"inscrevendo_{ev['id']}"] = True
+
+                # Formulario Dinamico de Inscricao
+                if st.session_state.get(f"inscrevendo_{ev['id']}", False):
+                    st.markdown("---")
+                    st.write(f"### Formulario de Inscricao — {ev['nome']}")
+                    
+                    dados_coletados = {}
+                    with st.form(key=f"form_inscri_dinamico_{ev['id']}"):
+                        # Campos Fixos
+                        dados_coletados["Nome Completo"] = st.text_input("Nome Completo", value=usuario['nome'])
+                        dados_coletados["E-mail"] = st.text_input("E-mail", value=usuario['email'])
+
+                        # Campos Escolhidos pelo Promotor
+                        campos = ev.get("campos_formulario", [])
+                        if "CPF" in campos:
+                            dados_coletados["CPF"] = st.text_input("CPF")
+                        if "Telefone" in campos:
+                            dados_coletados["Telefone"] = st.text_input("Telefone / WhatsApp")
+                        if "Registro Profissional" in campos:
+                            dados_coletados["Registro Profissional"] = st.text_input("Registro Profissional (OAB, CRM, CREA, etc.)")
+                        if "Instituicao" in campos:
+                            dados_coletados["Instituicao"] = st.text_input("Empresa / Instituicao")
+
+                        # Perguntas Customizadas
+                        perguntas = ev.get("perguntas_extra", [])
+                        if perguntas:
+                            st.write("**Perguntas Adicionais do Organizador:**")
+                            for p in perguntas:
+                                dados_coletados[p] = st.text_input(p)
+
+                        # Pagamento se for pago
+                        if ev['tipo'] == 'Pago':
+                            st.markdown("---")
+                            st.write(f"**Pagamento via Pix (Valor: R$ {ev['preco']:.2f})**")
                             payload_pix = f"00020126360014BR.GOV.BCB.PIX0114+5511999999999520400005303986540{ev['preco']:.2f}5802BR5905ROKFY6009SAO PAULO62070503***6304"
                             
-                            qr_img = gerar_qr_code_pix(payload_pix)
                             c_qr, c_txt = st.columns([1, 2])
                             with c_qr:
-                                st.image(qr_img, width=150)
+                                st.image(gerar_qr_code_pix(payload_pix), width=130)
                             with c_txt:
-                                st.write("Escaneie o QR Code acima com o app do seu banco ou copie a chave:")
                                 st.code(payload_pix, language="text")
-                                if st.button("Confirmar Pagamento PIX", key=f"confirm_{ev['id']}"):
-                                    st.success("Pagamento aprovado instantaneamente!")
-                                    st.session_state[f"pagando_{ev['id']}"] = False
-                    else:
-                        if st.button(f"Garantir Vaga Gratuita", key=f"free_{ev['id']}"):
-                            st.success("Inscrição confirmada com sucesso!")
+                                st.caption("Copie a chave Pix acima ou escaneie o QR Code.")
+
+                        if st.form_submit_button("Confirmar Inscrição"):
+                            salvar_inscricao_db(ev['id'], usuario['id'], dados_coletados)
+                            st.success("Inscricao confirmada com sucesso!")
+                            st.session_state[f"inscrevendo_{ev['id']}"] = False
+                            st.rerun()
+
                 st.markdown('</div>', unsafe_allow_html=True)
 
-    # 4. ANAIS DE EVENTOS
-    elif opcao == "Anais de Eventos" and usuario["perfil"] == "Organizador":
-        render_header_shape("Anais de Eventos", "Publicação e indexação acadêmica.")
+    # ------------------------------------------
+    # 4. GESTÃO DE INSCRITOS (PROMOTOR / ORGANIZADOR)
+    # ------------------------------------------
+    elif opcao == "Gestao de Inscritos" and usuario["perfil"] in ["Promotor de Eventos", "Organizador"]:
+        render_hero("Gestao de Inscritos", "Visualize os dados coletados nos formularios de cada evento.")
+        
         if not eventos_db:
-            st.warning("Cadastre um evento primeiro.")
+            st.info("Nenhum evento disponivel.")
         else:
-            st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
-            st.selectbox("Selecione o Evento:", [f"#{e['id']} - {e['nome']}" for e in eventos_db])
-            st.text_input("ISSN / ISBN", placeholder="Ex: 2447-8821")
-            st.file_uploader("Upload do Arquivo PDF dos Anais", type=["pdf"])
-            if st.button("Publicar Anais"):
-                st.success("Anais salvos!")
-            st.markdown('</div>', unsafe_allow_html=True)
+            ev_selecionado = st.selectbox("Selecione o Evento:", [f"#{e['id']} - {e['nome']}" for e in eventos_db])
+            ev_id = int(ev_selecionado.split('-')[0].replace('#', '').strip())
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM inscricoes WHERE evento_id = ?", (ev_id,))
+            rows = cursor.fetchall()
+            conn.close()
+            
+            if not rows:
+                st.info("Nenhuma inscricao realizada para este evento ainda.")
+            else:
+                lista_dados = []
+                for r in rows:
+                    item = json.loads(r["dados_inscricao"])
+                    item["Data Inscricao"] = r["data_inscricao"]
+                    lista_dados.append(item)
+                
+                df = pd.DataFrame(lista_dados)
+                st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
+                st.dataframe(df, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
-    # 5. EMISSÃO DE CERTIFICADOS & DOWNLOAD PDF (PASSO 3)
-    elif opcao == "Emissão de Certificados":
-        render_header_shape("Emissão de Certificados", "Gere o PDF oficial do certificado para download.")
+    # ------------------------------------------
+    # 5. EMISSÃO DE CERTIFICADOS
+    # ------------------------------------------
+    elif opcao == "Emissao de Certificados":
+        render_hero("Central de Certificados", "Gere certificados para qualquer categoria de participante ou baixe os seus.")
         
-        tab_gerar, tab_meus = st.tabs(["📜 Emitir Certificado", "📂 Meus Certificados Guardados"])
+        tab_emitir, tab_meus = st.tabs(["Emitir Certificado", "Meus Certificados Guardados"])
         
-        with tab_gerar:
+        with tab_emitir:
             if not eventos_db:
-                st.warning("Nenhum evento disponível.")
+                st.warning("Nenhum evento disponivel.")
             else:
                 st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
                 ev_sel = st.selectbox("Evento Vinculado:", [e['nome'] for e in eventos_db])
                 ev_obj = next((e for e in eventos_db if e['nome'] == ev_sel), None)
                 
-                mod_cert = st.selectbox("Modalidade", ["Participante", "Organizador", "Comissão Científica", "Palestrante"])
-                nome_p = st.text_input("Nome do Contemplado", value=usuario['nome'])
-                horas_p = st.number_input("Carga Horária", value=20)
+                # Categoria / Modalidade Específica
+                mod_cert = st.selectbox("Categoria do Certificado:", [
+                    "Participante",
+                    "Palestrante / Ministrante",
+                    "Organizador / Promotor",
+                    "Comissao Cientifica",
+                    "Avaliador / Parecerista",
+                    "Monitor",
+                    "Apresentador de Trabalho"
+                ])
                 
-                if st.button("Gerar e Registar Certificado"):
+                nome_p = st.text_input("Nome do Beneficiario", value=usuario['nome'])
+                horas_p = st.number_input("Carga Horaria (Horas)", value=20, min_value=1)
+                
+                if st.button("Gerar Certificado Oficial"):
                     if ev_obj and nome_p:
                         cod = salvar_certificado_db(ev_obj['id'], nome_p, mod_cert, horas_p)
-                        st.success(f"Certificado gerado com Sucesso! Código de Validação: {cod}")
+                        st.success(f"Certificado gerado com sucesso. Codigo de Validacao: {cod}")
                 st.markdown('</div>', unsafe_allow_html=True)
-                
+
         with tab_meus:
             meus_certs = listar_certificados_usuario(usuario['nome'])
             if not meus_certs:
-                st.info("Nenhum certificado emitido para o seu nome ainda.")
+                st.info("Nenhum certificado registrado para o seu nome ate o momento.")
             else:
                 for c in meus_certs:
                     st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
                     st.subheader(f"Certificado: {c['evento_nome']}")
-                    st.write(f"**Modalidade:** {c['modalidade']} | **Carga Horária:** {c['horas']} horas")
-                    st.write(f"**Autenticação:** `{c['codigo_validacao']}`")
+                    st.write(f"**Categoria:** {c['modalidade']} | **Carga Horaria:** {c['horas']} horas")
+                    st.write(f"**Codigo de Autenticidade:** `{c['codigo_validacao']}`")
                     
-                    # Gerar PDF em Tempo Real para Download
                     pdf_bytes = gerar_pdf_certificado(
                         nome_participante=c['nome_participante'],
                         evento_nome=c['evento_nome'],
@@ -533,7 +730,7 @@ else:
                     )
                     
                     st.download_button(
-                        label="📄 Baixar Certificado em PDF",
+                        label="Baixar Certificado em PDF",
                         data=pdf_bytes,
                         file_name=f"Certificado_Rokfy_{c['codigo_validacao']}.pdf",
                         mime="application/pdf",
@@ -541,7 +738,12 @@ else:
                     )
                     st.markdown('</div>', unsafe_allow_html=True)
 
-    # 6. SOBRE NÓS
-    elif opcao == "Sobre Nós / Contato":
-        render_header_shape("Sobre a Rokfy", "Plataforma completa de eventos.")
-        st.markdown('<div class="rokfy-card"><h3>Quem Somos</h3><p>Sua solução completa para gestão de eventos e certificação.</p></div>', unsafe_allow_html=True)
+    # ------------------------------------------
+    # 6. SOBRE A ROKFY
+    # ------------------------------------------
+    elif opcao == "Sobre a Rokfy":
+        render_hero("Sobre a Rokfy", "Tecnologia de ponta para organizacao de eventos, inscricoes e certificacao.")
+        st.markdown(
+            '<div class="rokfy-card"><h3>Solucao Completa para Eventos</h3><p>Plataforma dinamica desenvolvida para atender desde workshops locais ate grandes congressos nacionais.</p></div>', 
+            unsafe_allow_html=True
+        )
