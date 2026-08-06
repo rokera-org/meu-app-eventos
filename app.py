@@ -8,13 +8,14 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from PIL import Image
 
-# Imports para geração e manipulação de PDF/PowerPoint
+# Dependências para PPTX e DOCX
 from pptx import Presentation
+from docx import Document
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 
-st.set_page_config(page_title="Rokfy — Gerador de Certificados em Massa", layout="wide")
+st.set_page_config(page_title="Rokfy — Gerador de Certificados", layout="wide")
 
 # ==========================================
 # 1. ESTILO VISUAL ORIGINAL (PRESERVADO)
@@ -23,12 +24,6 @@ custom_css = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
-    @font-face {
-        font-family: 'Chomsky';
-        src: local('Chomsky'), local('Chomsky Regular'), local('Chomsky-Regular');
-        font-weight: normal; font-style: normal;
-    }
-
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
         background-color: #FAF6EE !important; color: #1A1A1A !important;
@@ -36,21 +31,32 @@ custom_css = """
     .stApp { background-color: #FAF6EE !important; }
 
     [data-testid="stSidebar"] { background-color: #F3ECE0 !important; border-right: 1px solid #E5DBD0 !important; }
-    .brand-logo-text { font-family: 'Chomsky', 'UnifrakturMaguntia', serif !important; font-size: 3.8rem !important; color: #E05A47 !important; text-align: center; margin: 0; line-height: 0.9; }
+    .brand-logo-text { font-family: serif !important; font-size: 3.2rem !important; color: #E05A47 !important; text-align: center; margin: 0; line-height: 0.9; font-weight: bold; }
     .brand-tag { font-size: 0.65rem !important; font-weight: 800 !important; letter-spacing: 3px !important; color: #1A1A1A !important; text-transform: uppercase; text-align: center; margin-top: 10px; margin-bottom: 20px; }
 
-    .top-navbar { display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; padding: 14px 28px; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 25px; }
-    .shape-container-top { width: 100%; background-color: #FA8072; border-radius: 24px 24px 0 0; padding: 35px 35px 15px 35px; color: #FFFFFF !important; position: relative; }
+    .shape-container-top { width: 100%; background-color: #FA8072; border-radius: 24px 24px 0 0; padding: 30px; color: #FFFFFF !important; }
     .shape-container-top h1, .shape-container-top p { color: #FFFFFF !important; }
-    .wave-divider { width: 100%; height: 60px; margin-bottom: 25px; }
+    .wave-divider { width: 100%; height: 50px; margin-bottom: 20px; }
     .wave-divider path { fill: #FA8072; }
     .rokfy-card { background: #FFFFFF; border-radius: 16px; padding: 26px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); border: 1px solid #EAE0D5; margin-bottom: 20px; }
+    
     .stButton>button { background-color: #E05A47 !important; color: #ffffff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; padding: 0.65rem 1.6rem !important; }
+    .step-indicator { font-weight: 800; color: #E05A47; text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem; margin-bottom: 5px; }
 </style>
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-def render_header_shape(titulo, sub_titulo):
+# Estado de Sessão para Gerenciar o Passo a Passo (Wizard)
+if "etapa" not in st.session_state:
+    st.session_state.etapa = 1
+
+def proxima_etapa():
+    st.session_state.etapa += 1
+
+def etapa_anterior():
+    st.session_state.etapa -= 1
+
+def render_header(titulo, sub_titulo):
     st.markdown(
         f"""
         <div class="shape-container-top">
@@ -64,303 +70,243 @@ def render_header_shape(titulo, sub_titulo):
         unsafe_allow_html=True
     )
 
+# Sidebar apenas com Logo Visual
+st.sidebar.markdown('<div class="brand-logo-text">Rokfy</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="brand-tag">Certificados em Massa</div>', unsafe_allow_html=True)
+st.sidebar.info(f"📍 **Etapa Atual: {st.session_state.etapa} de 4**")
+
 # ==========================================
-# 2. MOTOR DE GERAÇÃO DE CERTIFICADOS
+# FUNÇÕES DE PROCESSAMENTO DE ARQUIVOS
 # ==========================================
-def gerar_pdf_com_imagem_fundo(imagem_bytes, dados_linha, dados_plataforma, pos_x=400, pos_y=280):
-    """Gera um PDF em orientação paisagem usando uma imagem (PNG/JPG) como fundo."""
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=landscape(letter))
-    width, height = landscape(letter)
+def substituir_tags_texto(texto, mapa):
+    """Substitui <tag> no texto por valores do mapa."""
+    if not texto:
+        return ""
+    for k, v in mapa.items():
+        v_str = str(v) if v is not None else ""
+        texto = texto.replace(f"<{k}>", v_str).replace(f"<{k.lower()}>", v_str).replace(f"{{{k}}}", v_str)
+    return texto
 
-    # Adiciona a imagem de fundo
-    if imagem_bytes:
-        img_temp = Image.open(io.BytesIO(imagem_bytes))
-        img_temp_path = "/tmp/temp_bg.png"
-        img_temp.save(img_temp_path)
-        c.drawImage(img_temp_path, 0, 0, width=width, height=height)
-
-    # Escreve o texto principal concatenado das colunas da planilha
-    c.setFont("Helvetica-Bold", 18)
-    c.setFillColor(colors.HexColor("#1A1A1A"))
-    
-    # Monta texto do certificado
-    nome = dados_linha.get("nome", dados_linha.get("Nome", ""))
-    texto_principal = f"Certificamos que {nome}"
-    c.drawCentredString(pos_x, pos_y, texto_principal)
-
-    # Rodapé / Dados preenchidos na plataforma (CPF, Livro, Registro, etc.)
-    c.setFont("Helvetica", 10)
-    c.setFillColor(colors.HexColor("#555555"))
-    y_extra = 60
-    for chave, valor in dados_plataforma.items():
-        if valor:
-            c.drawString(40, y_extra, f"{chave}: {valor}")
-            y_extra -= 14
-
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-    return buffer
-
-def substituir_texto_pptx(pptx_bytes, mapa_substituicao):
-    """Substitui tags do tipo {nome}, {cpf} em um modelo do PowerPoint (.pptx)."""
+def processar_pptx(pptx_bytes, mapa):
     prs = Presentation(io.BytesIO(pptx_bytes))
     for slide in prs.slides:
         for shape in slide.shapes:
             if shape.has_text_frame:
                 for paragraph in shape.text_frame.paragraphs:
-                    for chave, valor in mapa_substituicao.items():
-                        tag = f"{{{chave}}}"
-                        if tag in paragraph.text:
-                            paragraph.text = paragraph.text.replace(tag, str(valor))
+                    paragraph.text = substituir_tags_texto(paragraph.text, mapa)
+    out = io.BytesIO()
+    prs.save(out)
+    out.seek(0)
+    return out
+
+def processar_docx(docx_bytes, mapa):
+    doc = Document(io.BytesIO(docx_bytes))
+    for p in doc.paragraphs:
+        p.text = substituir_tags_texto(p.text, mapa)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                cell.text = substituir_tags_texto(cell.text, mapa)
+    out = io.BytesIO()
+    doc.save(out)
+    out.seek(0)
+    return out
+
+# ==========================================
+# FLUXO PRINCIPAL DE ETAPAS
+# ==========================================
+
+# ------------------------------------------
+# ETAPA 1: CONFIGURAÇÃO DE E-MAIL (SMTP)
+# ------------------------------------------
+if st.session_state.etapa == 1:
+    render_header("Etapa I: Configuração do Servidor de E-mail", "Insira suas credenciais para que o sistema possa disparar as mensagens.")
     
-    output = io.BytesIO()
-    prs.save(output)
-    output.seek(0)
-    return output
+    st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
+    st.text_input("Servidor SMTP", value="smtp.gmail.com", key="smtp_server")
+    st.number_input("Porta SMTP", value=587, key="smtp_port")
+    st.text_input("Seu E-mail de Envio (Remetente)", key="smtp_user")
+    st.text_input("Senha / Senha de Aplicativo", type="password", key="smtp_pass")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# ==========================================
-# 3. INTERFACE E NAVEGAÇÃO
-# ==========================================
-st.sidebar.markdown('<div class="brand-logo-text">Rokfy</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div class="brand-tag">Certificados em Massa</div>', unsafe_allow_html=True)
-
-menu = st.sidebar.radio("Navegacao", [
-    "Gerador em Massa",
-    "Instrucoes da Planilha",
-    "Configuracao de E-mail (SMTP)"
-])
+    col1, col2 = st.columns([1, 1])
+    with col2:
+        st.button("Próximo: Modelo de Arquivo >", on_click=proxima_etapa, use_container_width=True)
 
 # ------------------------------------------
-# TELA 1: GERADOR EM MASSA
+# ETAPA 2: MODELO VISUAL / ARQUIVO
 # ------------------------------------------
-if menu == "Gerador em Massa":
-    render_header_shape("Gerador de Certificados em Massa", "Suba o modelo visual, conecte a planilha de participantes e distribua com um clique.")
+elif st.session_state.etapa == 2:
+    render_header("Etapa II: Modelo do Certificado", "Suba o arquivo base do certificado contendo as tags marcadas com < >.")
+    
+    st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
+    st.write("**Instruções de Tags no Modelo:**")
+    st.info("Coloque no seu arquivo tags como `<nome>`, `<cpf>`, `<curso>`, `<data>`, `<registro>`, `<livro>`, `<folha>`. O sistema irá substituir cada tag automaticamente pelos dados de cada participante.")
+    
+    tipo_arquivo = st.radio("Selecione o formato do modelo:", ["PowerPoint (.PPTX)", "Word (.DOCX)", "Imagem (PNG / JPG)"], key="tipo_modelo")
+    
+    ext = ["pptx"] if "PowerPoint" in tipo_arquivo else (["docx"] if "Word" in tipo_arquivo else ["png", "jpg", "jpeg"])
+    st.file_uploader("Upload do Modelo Base", type=ext, key="arquivo_modelo_uploaded")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.button("< Voltar: Servidor E-mail", on_click=etapa_anterior, use_container_width=True)
+    with c2:
+        st.button("Próximo: Dados dos Participantes >", on_click=proxima_etapa, use_container_width=True)
+
+# ------------------------------------------
+# ETAPA 3: DADOS DOS PARTICIPANTES
+# ------------------------------------------
+elif st.session_state.etapa == 3:
+    render_header("Etapa III: Dados dos Participantes", "Escolha como deseja inserir as informações que preencherão o certificado e os e-mails.")
 
     st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
-    st.subheader("1. Modelo Visual do Certificado")
+    opcao_dados = st.radio("Origem dos Dados:", ["Fazer Upload de Planilha Pronta (Excel / CSV)", "Preencher / Editar Tabela Direto no App"], key="opcao_dados")
     
-    tipo_modelo = st.radio("Selecione o formato do seu modelo:", ["Imagem (PNG / JPG / JPEG)", "PowerPoint (.PPTX)"])
-    
-    arquivo_modelo = st.file_uploader(
-        "Upload do Modelo", 
-        type=["png", "jpg", "jpeg"] if "Imagem" in tipo_modelo else ["pptx"],
-        help="Suba a arte base do seu certificado."
-    )
-    
-    if arquivo_modelo:
-        st.success(f"Modelo '{arquivo_modelo.name}' carregado com sucesso!")
+    if opcao_dados == "Fazer Upload de Planilha Pronta (Excel / CSV)":
+        arquivo_p = st.file_uploader("Upload da Planilha", type=["xlsx", "xls", "csv"], key="arquivo_planilha_uploaded")
+        if arquivo_p:
+            try:
+                df = pd.read_csv(arquivo_p) if arquivo_p.name.endswith('.csv') else pd.read_excel(arquivo_p)
+                st.session_state['df_participantes'] = df
+            except Exception as e:
+                st.error(f"Erro ao ler planilha: {e}")
+    else:
+        st.write("Edite a tabela diretamente abaixo. Adicione linhas ou colunas conforme necessário:")
+        df_padrao = pd.DataFrame({
+            "nome": ["Maria Silva", "João Santos"],
+            "email": ["maria@exemplo.com", "joao@exemplo.com"],
+            "cpf": ["123.456.789-00", "987.654.321-11"],
+            "curso": ["Treinamento Avançado", "Treinamento Avançado"],
+            "registro": ["REG-001", "REG-002"],
+            "livro": ["Livro 1", "Livro 1"],
+            "folha": ["10", "11"]
+        })
+        st.session_state['df_participantes'] = st.data_editor(df_padrao, num_rows="dynamic", use_container_width=True)
+
+    if 'df_participantes' in st.session_state and st.session_state['df_participantes'] is not None:
+        st.write("### Dados Carregados:")
+        st.dataframe(st.session_state['df_participantes'], use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.button("< Voltar: Modelo Base", on_click=etapa_anterior, use_container_width=True)
+    with c2:
+        st.button("Próximo: E-mail e Disparo >", on_click=proxima_etapa, use_container_width=True)
+
+# ------------------------------------------
+# ETAPA 4: E-MAIL PADRÃO, TAGS E GERADOR
+# ------------------------------------------
+elif st.session_state.etapa == 4:
+    render_header("Etapa IV: Mensagem de E-mail e Disparo", "Configure o modelo de e-mail com tags e efetue o envio privado em massa ou download.")
+
+    st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
+    st.subheader("1. Modelo Padrão de E-mail")
+    st.info("Você pode incluir qualquer tag no assunto e corpo da mensagem (ex: `<nome>`, `<curso>`). Cada pessoa receberá sua mensagem personalizada de forma estritamente privada.")
+
+    assunto_template = st.text_input("Assunto do E-mail", value="Seu Certificado do curso de <curso> está disponível!", key="assunto_template")
+    corpo_template = st.text_area("Corpo do E-mail", value="Olá <nome>,\n\nSegue em anexo o seu certificado do curso de <curso>.\nDados de Registro: Número <registro>, Livro <livro>, Folha <folha>.\n\nParabéns!", height=150, key="corpo_template")
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
-    st.subheader("2. Upload da Planilha de Participantes")
-    
-    arquivo_planilha = st.file_uploader(
-        "Upload da Planilha (Excel ou CSV)", 
-        type=["xlsx", "xls", "csv"],
-        help="A planilha DEVE conter obrigatoriamente a coluna 'email' ou 'E-mail'."
-    )
+    st.subheader("2. Finalizar e Disparar")
 
-    df_dados = None
-    coluna_email = None
+    df_final = st.session_state.get('df_participantes', None)
+    modelo_file = st.session_state.get('arquivo_modelo_uploaded', None)
+    tipo_m = st.session_state.get('tipo_modelo', "PowerPoint (.PPTX)")
 
-    if arquivo_planilha:
-        try:
-            if arquivo_planilha.name.endswith('.csv'):
-                df_dados = pd.read_csv(arquivo_planilha)
+    tab_disparo, tab_zip = st.tabs(["🚀 Disparar E-mails Privados em Massa", "📦 Baixar Todos os Certificados (ZIP)"])
+
+    with tab_disparo:
+        if st.button("Iniciar Envio em Massa"):
+            if not df_final or 'email' not in [str(c).lower() for c in df_final.columns]:
+                st.error("Garante que a tabela possui uma coluna de e-mail válida na Etapa III.")
+            elif not st.session_state.get('smtp_user') or not st.session_state.get('smtp_pass'):
+                st.error("Preencha as credenciais SMTP na Etapa I.")
             else:
-                df_dados = pd.read_excel(arquivo_planilha)
+                sucesso, erro = 0, 0
+                progresso = st.progress(0)
+                total = len(df_final)
 
-            st.write("### Previa da Planilha Carregada:")
-            st.dataframe(df_dados.head(5), use_container_width=True)
+                col_email = [c for c in df_final.columns if str(c).lower() == 'email'][0]
 
-            # Validação do e-mail obrigatório
-            colunas_lowercase = [str(c).strip().lower() for c in df_dados.columns]
-            
-            if "email" in colunas_lowercase or "e-mail" in colunas_lowercase:
-                idx = colunas_lowercase.index("email") if "email" in colunas_lowercase else colunas_lowercase.index("e-mail")
-                coluna_email = df_dados.columns[idx]
-                st.success(f"Coluna de e-mail obrigatoria identificada: '{coluna_email}'")
-            else:
-                st.error("A planilha NAO possui uma coluna chamada 'email' ou 'e-mail'. Adicione esta coluna para habilitar o envio.")
-        except Exception as e:
-            st.error(f"Erro ao ler arquivo de planilha: {e}")
-    st.markdown('</div>', unsafe_allow_html=True)
+                for idx, row in df_final.iterrows():
+                    mapa = row.to_dict()
+                    destinatario = str(row[col_email]).strip()
 
-    # Se a planilha e modelo estiverem carregados, exibe dados adicionais e gerador
-    if df_dados is not None and coluna_email is not None and arquivo_modelo is not None:
-        st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
-        st.subheader("3. Informações Adicionais para Preenchimento na Plataforma")
-        st.write("Digite abaixo dados fixos ou complementares que devam constar no documento (ex: Numero do Registro, Livro, Folha, Carga Horaria):")
+                    assunto_personalizado = substituir_tags_texto(assunto_template, mapa)
+                    corpo_personalizado = substituir_tags_texto(corpo_template, mapa)
 
-        col_p1, col_p2, col_p3 = st.columns(3)
-        with col_p1:
-            num_registro_init = st.text_input("Numero do Registro / Certificado", placeholder="Ex: CERT-2026-001")
-            livro_reg = st.text_input("Livro de Registro", placeholder="Ex: Livro 12")
-        with col_p2:
-            num_ordem = st.text_input("Numero de Ordem", placeholder="Ex: Fls. 45")
-            folha_reg = st.text_input("Folha de Registro", placeholder="Ex: 088")
-        with col_p3:
-            cpf_generico = st.text_input("CPF (se nao estiver na planilha)", placeholder="Opcional")
-            txt_extra = st.text_input("Observacoes Adicionais", placeholder="Ex: Portaria do MEC nº 123")
-
-        dados_plataforma = {
-            "Registro": num_registro_init,
-            "Livro": livro_reg,
-            "Ordem": num_ordem,
-            "Folha": folha_reg,
-            "CPF": cpf_generico,
-            "Observacoes": txt_extra
-        }
-
-        st.markdown("---")
-        st.subheader("4. Processamento e Distribuicao")
-        
-        tab_download, tab_email = st.tabs(["Baixar Todos em ZIP", "Enviar por E-mail em Massa"])
-
-        # OPÇÃO A: DOWNLOAD EM LOTE (ZIP)
-        with tab_download:
-            st.write("Gere todos os certificados em PDF compactados em um unico arquivo ZIP.")
-            if st.button("Gerar Arquivo ZIP com Todos os Certificados"):
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                    for index, row in df_dados.iterrows():
-                        nome_dest = str(row.get("nome", row.get("Nome", f"participante_{index+1}"))).strip()
-                        dados_linha = row.to_dict()
-
-                        if "Imagem" in tipo_modelo:
-                            pdf_bytes = gerar_pdf_com_imagem_fundo(
-                                arquivo_modelo.getvalue(),
-                                dados_linha,
-                                dados_plataforma
-                            )
-                            zip_file.writestr(f"Certificado_{nome_dest}.pdf", pdf_bytes.getvalue())
+                    try:
+                        # Processa Arquivo de Anexo
+                        if modelo_file:
+                            bytes_m = modelo_file.getvalue()
+                            if "PowerPoint" in tipo_m:
+                                file_out = processar_pptx(bytes_m, mapa)
+                                filename = f"Certificado_{row.get('nome', idx)}.pptx"
+                                subtype = "vnd.openxmlformats-officedocument.presentationml.presentation"
+                            elif "Word" in tipo_m:
+                                file_out = processar_docx(bytes_m, mapa)
+                                filename = f"Certificado_{row.get('nome', idx)}.docx"
+                                subtype = "vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            else:
+                                file_out = io.BytesIO(bytes_m)
+                                filename = f"Certificado_{row.get('nome', idx)}.png"
+                                subtype = "png"
                         else:
-                            # Caso seja PowerPoint
-                            mapa = {**dados_linha, **dados_plataforma}
-                            pptx_mod = substituir_texto_pptx(arquivo_modelo.getvalue(), mapa)
-                            zip_file.writestr(f"Certificado_{nome_dest}.pptx", pptx_mod.getvalue())
+                            file_out = None
 
-                zip_buffer.seek(0)
-                st.success("Todos os certificados foram gerados com sucesso!")
-                st.download_button(
-                    label="Baixar Arquivo ZIP",
-                    data=zip_buffer,
-                    file_name="Certificados_Rokfy_Massa.zip",
-                    mime="application/zip"
-                )
+                        # Montagem de e-mail PRIVADO e INDIVIDUAL
+                        msg = MIMEMultipart()
+                        msg['From'] = st.session_state['smtp_user']
+                        msg['To'] = destinatario
+                        msg['Subject'] = assunto_personalizado
+                        msg.attach(MIMEText(corpo_personalizado, 'plain'))
 
-        # OPÇÃO B: ENVIO POR E-MAIL
-        with tab_email:
-            st.write("Envie automaticamente o certificado em anexo para cada e-mail cadastrado na planilha.")
-            
-            assunto_email = st.text_input("Assunto do E-mail", value="Seu Certificado de Participacao esta disponivel!")
-            corpo_email = st.text_area("Corpo da Mensagem", value="Ola! Segue em anexo o seu certificado oficial. Parabéns!")
-
-            if st.button("Disparar E-mails em Massa"):
-                if "smtp_config" not in st.session_state:
-                    st.error("Configure as credenciais do Servidor SMTP na aba 'Configuração de E-mail (SMTP)' na barra lateral antes de enviar.")
-                else:
-                    smtp_data = st.session_state["smtp_config"]
-                    sucessos = 0
-                    erros = 0
-
-                    progresso = st.progress(0)
-                    total = len(df_dados)
-
-                    for index, row in df_dados.iterrows():
-                        email_dest = str(row[coluna_email]).strip()
-                        nome_dest = str(row.get("nome", row.get("Nome", "Participante"))).strip()
-                        
-                        try:
-                            # Gerar PDF
-                            dados_linha = row.to_dict()
-                            pdf_file = gerar_pdf_com_imagem_fundo(
-                                arquivo_modelo.getvalue(),
-                                dados_linha,
-                                dados_plataforma
-                            )
-
-                            # Montar e-mail
-                            msg = MIMEMultipart()
-                            msg['From'] = smtp_data['usuario']
-                            msg['To'] = email_dest
-                            msg['Subject'] = assunto_email
-                            msg.attach(MIMEText(corpo_email, 'plain'))
-
-                            # Anexo PDF
-                            anexo = MIMEApplication(pdf_file.getvalue(), _subtype="pdf")
-                            anexo.add_header('Content-Disposition', 'attachment', filename=f"Certificado_{nome_dest}.pdf")
+                        if file_out:
+                            anexo = MIMEApplication(file_out.getvalue(), _subtype=subtype)
+                            anexo.add_header('Content-Disposition', 'attachment', filename=filename)
                             msg.attach(anexo)
 
-                            # Envio SMTP
-                            server = smtplib.SMTP(smtp_data['server'], int(smtp_data['porta']))
-                            server.starttls()
-                            server.login(smtp_data['usuario'], smtp_data['senha'])
-                            server.send_message(msg)
-                            server.quit()
+                        # Envio único isolado
+                        s = smtplib.SMTP(st.session_state['smtp_server'], int(st.session_state['smtp_port']))
+                        s.starttls()
+                        s.login(st.session_state['smtp_user'], st.session_state['smtp_pass'])
+                        s.send_message(msg)
+                        s.quit()
 
-                            sucessos += 1
-                        except Exception as e:
-                            erros += 1
+                        sucesso += 1
+                    except Exception as e:
+                        erro += 1
 
-                        progresso.progress((index + 1) / total)
+                    progresso.progress((idx + 1) / total)
 
-                    st.success(f"Disparo concluido! Enviados com sucesso: {sucessos} | Falhas: {erros}")
+                st.success(f"Disparo concluído! {sucesso} e-mails enviados com sucesso. ({erro} falhas)")
 
-        st.markdown('</div>', unsafe_allow_html=True)
+    with tab_zip:
+        if st.button("Gerar Arquivo ZIP com Todos os Certificados"):
+            if modelo_file and df_final is not None:
+                zip_b = io.BytesIO()
+                with zipfile.ZipFile(zip_b, "a", zipfile.ZIP_DEFLATED, False) as zf:
+                    for idx, row in df_final.iterrows():
+                        mapa = row.to_dict()
+                        nome_p = str(row.get('nome', f'participante_{idx+1}'))
+                        bytes_m = modelo_file.getvalue()
 
-# ------------------------------------------
-# TELA 2: INSTRUÇÕES DA PLANILHA
-# ------------------------------------------
-elif menu == "Instrucoes da Planilha":
-    render_header_shape("Estrutura da Planilha", "Saiba como formatar seu arquivo Excel ou CSV.")
-    
-    st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
-    st.subheader("Regras da Planilha:")
-    st.markdown("""
-    1. **E-mail (Obrigatório):**
-       * Deve haver uma coluna chamada obrigatoriamente **`email`** ou **`E-mail`**. Ela servira para fazer o disparo dos documentos.
-    
-    2. **Outras Informações (100% Livres):**
-       * Todas as outras colunas sao opcionais e flexiveis. Voce pode adicionar:
-         * `Nome` ou `nome`
-         * `CPF`
-         * `Curso`
-         * `Data`
-         * `Carga Horaria`
-         * `Registro`, `Livro`, `Folha` (se desejar colocar na planilha ao inves da plataforma)
+                        if "PowerPoint" in tipo_m:
+                            f_out = processar_pptx(bytes_m, mapa)
+                            zf.writestr(f"Certificado_{nome_p}.pptx", f_out.getvalue())
+                        elif "Word" in tipo_m:
+                            f_out = processar_docx(bytes_m, mapa)
+                            zf.writestr(f"Certificado_{nome_p}.docx", f_out.getvalue())
 
-    3. **Substituição de Tags no PowerPoint (.PPTX):**
-       * Caso utilize um modelo do PowerPoint, insira textos no seu slide no formato `{nome_da_coluna}`.
-       * *Exemplo:* `Certificamos que {Nome}, portador do CPF {CPF}, concluiu o curso de {Curso}.`
-    """)
+                zip_b.seek(0)
+                st.download_button("Baixar Arquivo ZIP", data=zip_b, file_name="Certificados.zip", mime="application/zip")
+            else:
+                st.error("Verifique se o modelo e a planilha/tabela foram inseridos.")
+
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ------------------------------------------
-# TELA 3: CONFIGURAÇÃO DE E-MAIL (SMTP)
-# ------------------------------------------
-elif menu == "Configuracao de E-mail (SMTP)":
-    render_header_shape("Configuracao de E-mail (SMTP)", "Conecte sua conta de e-mail para habilitar disparos em massa.")
-    
-    st.markdown('<div class="rokfy-card">', unsafe_allow_html=True)
-    st.subheader("Dados do Servidor SMTP")
-    
-    servidor_smtp = st.text_input("Servidor SMTP", value="smtp.gmail.com")
-    porta_smtp = st.number_input("Porta SMTP", value=587)
-    usuario_smtp = st.text_input("Seu E-mail de Envio")
-    senha_smtp = st.text_input("Senha / Senha de Aplicativo", type="password")
-
-    if st.button("Salvar Configuracoes SMTP"):
-        if servidor_smtp and usuario_smtp and senha_smtp:
-            st.session_state["smtp_config"] = {
-                "server": servidor_smtp,
-                "porta": porta_smtp,
-                "usuario": usuario_smtp,
-                "senha": senha_smtp
-            }
-            st.success("Configuracoes de e-mail salvas na sessao com sucesso!")
-        else:
-            st.error("Preencha todos os campos do servidor SMTP.")
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.button("< Voltar: Tabela de Participantes", on_click=etapa_anterior, use_container_width=False)
